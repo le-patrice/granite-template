@@ -1,7 +1,8 @@
 """
 Authentication controller.
 
-POST /api/v1/auth/login   – password exchange → JWT bearer token
+POST /api/v1/auth/login   – OAuth2 & JSON password exchange → JWT bearer token
+POST /api/v1/auth/token   – OAuth2 standard alias
 POST /api/v1/auth/logout  – invalidate current session token (JWT required)
 """
 from datetime import datetime, timezone
@@ -20,8 +21,9 @@ from app.core.security import (
     revoke_token,
     verify_password_async,
 )
+from app.core.settings import settings
 from app.domain.users.contracts import IUserRepository
-from app.domain.users.schemas import LoginRequest, TokenResponse
+from app.domain.users.schemas import TokenResponse
 from app.presentation.guards.auth_guard import JWTAuthGuard
 
 
@@ -34,24 +36,45 @@ class AuthController(Controller):
     dependencies = {"user_repo": Provide(provide_user_repo)}
 
     @post(
-        path="/login",
+        path=["/login", "/token"],
         status_code=HTTP_201_CREATED,
         summary="Obtain bearer token",
-        description="Exchange email + password for a signed JWT bearer token.",
+        description="Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.",
     )
     async def login(
         self,
-        data: LoginRequest,
+        request: Request,
         user_repo: IUserRepository,
     ) -> TokenResponse:
-        user = await user_repo.get_by_email(data.email)
-        # verify_password_async runs Argon2 in an executor so the event loop
-        # is never blocked during the CPU-intensive KDF.
-        if not user or not await verify_password_async(data.password, user.hashed_password):
+        content_type = request.content_type[0] if request.content_type else ""
+        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            form = await request.form()
+            email_or_user = form.get("username") or form.get("email") or ""
+            password = form.get("password") or ""
+        else:
+            try:
+                body = await request.json()
+                email_or_user = body.get("email") or body.get("username") or ""
+                password = body.get("password") or ""
+            except Exception:
+                raise NotAuthorizedException("Invalid login credentials format.")
+
+        if not email_or_user or not password:
             raise NotAuthorizedException("Incorrect email or password.")
 
-        token = create_access_token(subject=str(user.id))
-        return TokenResponse(access_token=token)
+        user = await user_repo.get_by_email(str(email_or_user))
+        if not user or not await verify_password_async(str(password), user.hashed_password):
+            raise NotAuthorizedException("Incorrect email or password.")
+
+        token = create_access_token(
+            subject=str(user.id),
+            is_superuser=bool(user.is_superuser),
+        )
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        )
 
     @post(
         path="/logout",
@@ -65,8 +88,6 @@ class AuthController(Controller):
     )
     async def logout(self, request: Request) -> dict:
         jti: str = request.scope.get("token_jti", "")
-        # Calculate remaining TTL from the JWT exp claim so the blocklist
-        # entry auto-expires when the token would have expired anyway.
         auth_header = request.headers.get("Authorization", "")
         token = auth_header[len("Bearer "):]
         try:

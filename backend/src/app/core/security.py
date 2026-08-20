@@ -136,17 +136,23 @@ def _build_payload(
 def create_access_token(
     subject: str,
     expires_delta: Optional[timedelta] = None,
+    is_superuser: bool = False,
+    extra: Optional[dict] = None,
 ) -> str:
     """
     Issue a bearer access token for *subject* (user UUID string).
 
     The token carries:
-    •  ``sub``  – user UUID
-    •  ``exp``  – expiry timestamp
-    •  ``iat``  – issued-at timestamp
-    •  ``jti``  – UUID4 for revocation tracking
+    •  ``sub``          – user UUID
+    •  ``is_superuser`` – superadmin flag
+    •  ``exp``          – expiry timestamp
+    •  ``iat``          – issued-at timestamp
+    •  ``jti``          – UUID4 for revocation tracking
     """
-    payload = _build_payload(subject, expires_delta, extra=None)
+    combined_extra = {"is_superuser": bool(is_superuser)}
+    if extra:
+        combined_extra.update(extra)
+    payload = _build_payload(subject, expires_delta, extra=combined_extra)
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
