@@ -1,235 +1,206 @@
-# Developer & Contributor Guide
+# Developer Handbook & Implementation Guide
 
-Welcome to the development guide for the Enterprise Platform. This guide is organized according to the [Diátaxis](https://diataxis.fr/) documentation system.
-
----
-
-## 1. Prerequisites & Environment Setup
-
-All runtime dependencies (Python runtime, PostgreSQL, TimescaleDB, Valkey, Traefik) run hermetically inside rootless containers. You do not need Python or PostgreSQL installed on your host system.
-
-### Required Host Tools
-- **Container Engine:** [Podman](https://podman.io/) (v4.5+) and `podman-compose`
-- **Build Tool:** GNU `make`
-
-### Optional Local Tools (for local IDE autocompletion)
-- **Python:** 3.11+ with [`uv`](https://github.com/astral-sh/uv)
-- **Node.js:** 20+ with `npm`
+> **Target Audience:** Backend, Frontend, and Full-Stack Platform Engineers  
+> **Standard:** Diátaxis Tutorial & How-To Guide
 
 ---
 
-## 2. Quickstart Tutorial
+## 1. Local Environment Prerequisites
 
-Follow these steps to initialize your local development cluster:
+Ensure the following tools are installed on your workstation:
+- **Operating System:** Linux (Ubuntu 22.04+, Fedora 38+, Debian 12+, Arch Linux) or macOS with Podman Machine.
+- **Container Engine:** **Podman 4.5+ or 5.x** (configured for rootless operation) or Docker 24+.
+- **Compose Provider:** `podman-compose` or `docker-compose-plugin`.
+- **Build & Task Automation:** GNU `make` 4.x.
+- **Python Tooling:** Python 3.11+ and `uv` (optional for local editor LSP indexers).
+- **Frontend Tooling:** Node.js 22+ and `npm` 10+.
+
+---
+
+## 2. Fast Local Bootstrapping
 
 ```bash
-# 1. Clone repository and start container services
-git clone <repo-url> && cd LiteStar
+# 1. Clone your project repository
+git clone <repository-url> && cd <project-directory>
+
+# 2. Initialize environment file from template (if not already present)
+cp .env.example .env
+
+# 3. Start the full 8-container development stack
 make up
 
-# 2. Run initial database migrations
+# 4. Apply database migrations
 make migrate
 
-# 3. Seed initial platform superuser (admin@platform.internal / AdminSecurePassword2026!)
+# 5. Seed default platform superuser
 make seed
 
-# 4. Verify everything works by running the test suite
+# 6. Run the complete automated test suite
 make test
 ```
 
+Access your running development services:
+- **Application Ingress:** `http://localhost:8000`
+- **Interactive Swagger Docs:** `http://localhost:8000/docs/swagger`
+- **Interactive Scalar Docs:** `http://localhost:8000/docs/scalar`
+- **Traefik Gateway Dashboard:** `http://localhost:8080/dashboard/`
+- **Mailpit Email UI:** `http://localhost:8025`
+- **Prometheus Metrics:** `http://localhost:8000/metrics`
+
 ---
 
-## 3. How-To Guides
+## 3. Tutorial: Adding a New Domain Feature
 
-### How to Add a New Domain Module
+Follow this step-by-step pattern to introduce a new business capability (e.g. `organizations`) with full clean architecture compliance.
 
-Follow this 5-step clean architecture recipe when creating a new domain (e.g., `devices`):
-
-#### Step 1: Define Domain Models & Schemas
-Create `backend/src/app/domain/devices/models.py` and `schemas.py`:
+### Step 1: Define Domain Models, Schemas & Contracts
+Create `backend/src/app/domain/organizations/`:
+- `models.py`: SQLAlchemy declarative entity inheriting from `Base`.
+- `schemas.py`: `msgspec.Struct` definitions for input DTOs and responses.
+- `contracts.py`: Abstract Protocol interface for the repository.
 
 ```python
-# backend/src/app/domain/devices/models.py
+# backend/src/app/domain/organizations/models.py
+import uuid
 from sqlalchemy import String
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from app.domain.base import AuditBase
+from app.domain.base import Base
 
-class Device(AuditBase):
-    __tablename__ = "platform_devices"
+class Organization(Base):
+    __tablename__ = "organizations"
 
-    serial_number: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
 ```
 
 ```python
-# backend/src/app/domain/devices/schemas.py
+# backend/src/app/domain/organizations/schemas.py
+import uuid
 import msgspec
 
-class DeviceCreate(msgspec.Struct, frozen=True):
-    serial_number: str
+class OrganizationCreate(msgspec.Struct, frozen=True):
     name: str
 
-class DeviceRead(msgspec.Struct, frozen=True):
-    id: str
-    serial_number: str
+class OrganizationRead(msgspec.Struct, frozen=True):
+    id: uuid.UUID
     name: str
 ```
 
-#### Step 2: Define Domain Abstract Contract
-Create `backend/src/app/domain/devices/contracts.py`:
-
 ```python
-# backend/src/app/domain/devices/contracts.py
+# backend/src/app/domain/organizations/contracts.py
 from abc import ABC, abstractmethod
 import uuid
-from app.domain.devices.models import Device
+from app.domain.organizations.models import Organization
 
-class IDeviceRepository(ABC):
+class IOrganizationRepository(ABC):
     @abstractmethod
-    async def get_by_id(self, device_id: uuid.UUID) -> Device | None:
-        ...
-
+    async def get_by_id(self, org_id: uuid.UUID) -> Organization | None: ...
     @abstractmethod
-    async def create(self, device: Device) -> Device:
-        ...
+    async def create(self, org: Organization) -> Organization: ...
 ```
 
-#### Step 3: Implement Persistence Adapter
-Create `backend/src/app/adapters/postgres/device_repository.py`:
+### Step 2: Implement the Postgres Repository Adapter
+Create `backend/src/app/adapters/postgres/organization_repository.py`:
 
 ```python
-# backend/src/app/adapters/postgres/device_repository.py
 import uuid
 from advanced_alchemy.repository import SQLAlchemyAsyncRepository
-from app.domain.devices.contracts import IDeviceRepository
-from app.domain.devices.models import Device
+from app.domain.organizations.contracts import IOrganizationRepository
+from app.domain.organizations.models import Organization
 
-class PostgresDeviceRepository(SQLAlchemyAsyncRepository[Device], IDeviceRepository):
-    model_type = Device
+class PostgresOrganizationRepository(SQLAlchemyAsyncRepository[Organization], IOrganizationRepository):
+    model_type = Organization
 
-    async def get_by_id(self, device_id: uuid.UUID) -> Device | None:
-        return await self.get_one_or_none(id=device_id)
+    async def get_by_id(self, org_id: uuid.UUID) -> Organization | None:
+        return await self.get_one_or_none(id=org_id)
 
-    async def create(self, device: Device) -> Device:
-        return await self.add(device)
+    async def create(self, org: Organization) -> Organization:
+        return await self.add(org, auto_commit=True)
 ```
 
-#### Step 4: Implement Controller & Dependency Injection
-Create `backend/src/app/presentation/api/v1/devices_controller.py`:
+### Step 3: Build the Presentation Controller
+Create `backend/src/app/presentation/api/v1/organizations_controller.py`:
 
 ```python
-# backend/src/app/presentation/api/v1/devices_controller.py
 from litestar import Controller, get, post
 from litestar.di import Provide
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.adapters.postgres.device_repository import PostgresDeviceRepository
-from app.domain.devices.contracts import IDeviceRepository
-from app.domain.devices.models import Device
-from app.domain.devices.schemas import DeviceCreate, DeviceRead
+from app.adapters.postgres.organization_repository import PostgresOrganizationRepository
+from app.domain.organizations.contracts import IOrganizationRepository
+from app.domain.organizations.models import Organization
+from app.domain.organizations.schemas import OrganizationCreate, OrganizationRead
 from app.presentation.guards.auth_guard import JWTAuthGuard
 
-async def provide_device_repo(db_session: AsyncSession) -> IDeviceRepository:
-    return PostgresDeviceRepository(session=db_session)
+async def provide_org_repo(db_session: AsyncSession) -> IOrganizationRepository:
+    return PostgresOrganizationRepository(session=db_session)
 
-class DevicesController(Controller):
-    path = "/api/v1/devices"
+class OrganizationsController(Controller):
+    path = "/organizations"
     guards = [JWTAuthGuard()]
-    dependencies = {"device_repo": Provide(provide_device_repo)}
+    dependencies = {"org_repo": Provide(provide_org_repo)}
 
-    @post()
-    async def create_device(self, data: DeviceCreate, device_repo: IDeviceRepository) -> DeviceRead:
-        entity = Device(serial_number=data.serial_number, name=data.name)
-        saved = await device_repo.create(entity)
-        return DeviceRead(id=str(saved.id), serial_number=saved.serial_number, name=saved.name)
+    @post(path="/", status_code=201)
+    async def create_org(self, data: OrganizationCreate, org_repo: IOrganizationRepository) -> OrganizationRead:
+        org = await org_repo.create(Organization(name=data.name))
+        return OrganizationRead(id=org.id, name=org.name)
 ```
 
-#### Step 5: Register Router & Model in Alembic
-1. Add `DevicesController` to `backend/src/app/presentation/api/router.py`.
-2. Import `app.domain.devices.models` in [`backend/alembic/env.py`](file:///home/pat/Business/LiteStar/backend/alembic/env.py).
-3. Generate migration:
-   ```bash
-   make migrate-revision MSG="add_devices_table"
-   make migrate
-   ```
+### Step 4: Register the Controller
+In `backend/src/app/presentation/api/router.py`, include the new controller in `api_router`:
 
----
+```python
+from app.presentation.api.v1.organizations_controller import OrganizationsController
 
-### How to Manage Database Migrations
+api_router = Router(
+    path="/api/v1",
+    route_handlers=[
+        AuthController,
+        UsersController,
+        TelemetryController,
+        OrganizationsController,
+    ],
+)
+```
 
-All migrations run inside the container to guarantee environment parity:
-
+### Step 5: Generate and Apply Database Migrations
 ```bash
-# Generate a new migration based on ORM changes
-make migrate-revision MSG="add_gin_trgm_index"
+# 1. Create autodetected migration revision
+make migration-create MSG="add_organizations_table"
 
-# Apply pending migrations
+# 2. Apply migration into containerized database
 make migrate
-
-# Rollback the last migration
-make migrate-down
-
-# View migration history
-make migrate-history
-
-# Check currently applied revision in DB
-make migrate-show
 ```
 
----
-
-### How to Sync Frontend API Clients
-
-The frontend client is generated from the OpenAPI schema using `@hey-api/openapi-ts`:
-
-```bash
-# 1. Export OpenAPI spec from Litestar app to dist/openapi.json
-make export-schema
-
-# 2. Build the TypeScript client inside the frontend workspace
-cd frontend && npm run generate-client
-```
-
-CI will automatically fail if the generated client drifts from backend schema changes.
-
----
-
-### How to Write Fast Transactional Tests
-
-Tests use the `db_session` fixture from [`backend/tests/conftest.py`](file:///home/pat/Business/LiteStar/backend/tests/conftest.py), which wraps test queries inside a `session.begin_nested()` SAVEPOINT. All mutations automatically roll back upon test completion without wiping database schemas.
+### Step 6: Write Automated Tests
+Create `backend/tests/api/test_organizations.py`:
 
 ```python
 import pytest
 from httpx import AsyncClient
 
 @pytest.mark.asyncio
-async def test_create_user_and_rollback(async_client: AsyncClient, db_session):
-    # This user creation is isolated within a sub-transaction
-    response = await async_client.post(
-        "/api/v1/users/register",
-        json={"email": "isolated@test.internal", "password": "SecurePassword123!", "full_name": "Test User"},
+async def test_create_organization(async_client: AsyncClient, registered_user: dict):
+    headers = {"Authorization": f"Bearer {registered_user['token']}"}
+    resp = await async_client.post(
+        "/api/v1/organizations",
+        json={"name": "Acme Corporation"},
+        headers=headers,
     )
-    assert response.status_code == 201
-
-    # When the test function finishes, teardown rolls back the savepoint.
-    # Subsequent tests will see a completely clean database.
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["name"] == "Acme Corporation"
 ```
 
----
+### Step 7: Auto-Sync Frontend TypeScript SDK
+```bash
+# Exports OpenAPI 3.1 JSON schema and compiles typed TypeScript bindings
+make frontend-sync
+```
 
-## 4. Makefile Command Reference
+Frontend components can now import strongly-typed client functions directly:
+```typescript
+import { createOrg } from "@/client";
 
-| Command | Action |
-| :--- | :--- |
-| `make up` | Start all Podman containers (`postgres`, `valkey`, `app`, `traefik`, `frontend`) |
-| `make down` | Tear down containers and wipe local ephemeral networks |
-| `make build` | Compile the multi-stage Containerfile |
-| `make migrate` | Run `alembic upgrade head` inside the running app container |
-| `make migrate-revision MSG="..."` | Generate an autogenerated Alembic migration |
-| `make seed` | Execute the idempotent superuser seed script |
-| `make test` | Run fast unit and integration tests (`pytest -m "not slow"`) |
-| `make test-slow` | Run full migration-cycle test suite against temporary schema |
-| `make export-schema` | Export OpenAPI JSON spec to `dist/openapi.json` |
-| `make backup` | Execute automated PostgreSQL dump and Valkey snapshot |
-| `make restore BACKUP_FILE=...` | Restore database state from a `.dump` archive |
-| `make lint` | Run `ruff` check/format on Python and `tsc` on TypeScript |
-| `make shell` | Open an interactive bash session inside the backend container |
+const response = await createOrg({ body: { name: "Acme Corporation" } });
+```

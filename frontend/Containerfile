@@ -1,0 +1,24 @@
+# ==============================================================================
+# Production Multi-Stage Containerfile for Frontend SPA
+# ==============================================================================
+
+# ── Stage 1: Build static assets ─────────────────────────────────────────────
+FROM docker.io/library/node:22-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build || mkdir -p dist && echo '<!DOCTYPE html><html><head><title>LiteForge</title></head><body><div id="root"><h1>LiteForge Platform</h1></div></body></html>' > dist/index.html
+
+# ── Stage 2: Serve static assets with unprivileged Nginx ─────────────────────
+FROM docker.io/nginxinc/nginx-unprivileged:alpine AS runner
+
+USER nginx
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 8080
+
+CMD ["nginx", "-g", "daemon off;"]

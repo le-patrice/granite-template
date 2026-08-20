@@ -39,6 +39,10 @@ class AppSettings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str = "AdminSecurePassword2026!"
     FIRST_SUPERUSER_NAME: str = "Platform Administrator"
 
+    # ── Observability & Crash Reporting ───────────────────────────────────────
+    SENTRY_DSN: Optional[str] = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 1.0
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

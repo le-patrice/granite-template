@@ -79,12 +79,23 @@ services:
   cloudflared:
     image: docker.io/cloudflare/cloudflared:latest
     container_name: cloudflared_tunnel
-    restart: unless-stopped
+    restart: "no"       # Do not crash-loop if CLOUDFLARED_TUNNEL_TOKEN is unconfigured
     command: tunnel --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARED_TUNNEL_TOKEN:-}
     depends_on:
       - traefik
+    networks:
+      - platform_net
+
+  # ── Mailpit Mock SMTP Server (Development Email Inspection) ────────────────
+  mailpit:
+    image: docker.io/axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"      # SMTP ingress
+      - "8025:8025"      # Web UI (http://localhost:8025)
     networks:
       - platform_net
 
