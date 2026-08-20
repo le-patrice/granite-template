@@ -6,7 +6,7 @@ After=network-online.target local-fs.target
 ContainerName=postgres-db
 Image=docker.io/timescale/timescaledb-ha:pg16
 Network=platform.network
-Volume=postgres.volume:/var/lib/postgresql/data:Z
+Volume=postgres.volume:/home/postgres/pgdata/data:Z
 Environment=POSTGRES_USER=app_user
 Environment=POSTGRES_PASSWORD=secure_dev_password
 Environment=POSTGRES_DB=app_db

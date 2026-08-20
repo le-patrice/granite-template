@@ -100,29 +100,17 @@ worker-logs: ## Tail live logs from SAQ distributed background task worker
 	@$(COMPOSE_BASE) logs -f --tail=200 worker
 
 .PHONY: down
-down: ## Stop and remove all containers and network mesh cleanly
+down: ## Stop and remove stack containers (preserves database volumes)
 	@echo -e "$(YELLOW)Stopping stack containers...$(NC)"
 	@$(COMPOSE_BASE) stop -t 5 2>/dev/null || true
-	@$(COMPOSE_BASE) down || ( \
-		echo -e "$(YELLOW)Handling rootless namespace cleanup...$(NC)"; \
-		podman unshare -- killall -9 slirp4netns pasta 2>/dev/null || true; \
-		podman rm -f postgres_db 2>/dev/null || true; \
-		$(COMPOSE_BASE) down \
-	)
-	@echo -e "$(GREEN)✅ Containers stopped cleanly$(NC)"
+	@$(COMPOSE_BASE) down
+	@echo -e "$(GREEN)✅ Containers stopped cleanly (Database volumes preserved)$(NC)"
 
 .PHONY: down-volumes
-down-volumes: ## Stop stack and remove all persistent data volumes (CAUTION)
-	@echo -e "$(RED)⚠️  Deleting all data volumes including database data. Ctrl+C to cancel...$(NC)"
-	@sleep 3
-	@$(COMPOSE_BASE) stop -t 5 2>/dev/null || true
-	@$(COMPOSE_BASE) down -v || ( \
-		echo -e "$(YELLOW)Handling rootless namespace cleanup...$(NC)"; \
-		podman unshare -- killall -9 slirp4netns pasta 2>/dev/null || true; \
-		podman rm -f postgres_db 2>/dev/null || true; \
-		$(COMPOSE_BASE) down -v \
-	)
-	@echo -e "$(GREEN)✅ Containers and volumes removed$(NC)"
+down-volumes: ## Stop stack and PERMANENTLY DESTROY all database data volumes
+	@echo -e "$(RED)⚠️  WARNING: Deleting all persistent database and cache volumes!$(NC)"
+	@$(COMPOSE_BASE) down -v
+	@echo -e "$(GREEN)✅ Containers and persistent volumes wiped clean$(NC)"
 
 .PHONY: down-check
 down-check: ## Stop project and verify no lingering containers remain on host

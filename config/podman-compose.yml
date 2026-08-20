@@ -197,11 +197,12 @@ services:
     container_name: postgres_db
     restart: unless-stopped
     environment:
+      - PGDATA=/var/lib/postgresql/data
       - POSTGRES_USER=app_user
       - POSTGRES_PASSWORD=secure_dev_password
       - POSTGRES_DB=app_db
     volumes:
-      - pg_data:/var/lib/postgresql/data:Z
+      - postgres_data:/var/lib/postgresql/data:Z
     ports:
       - "5432:5432"    # direct access for migrations & psql
     healthcheck:
@@ -226,5 +227,7 @@ services:
       - platform_net
 
 volumes:
-  pg_data:
+  postgres_data:
+    name: config_postgres_data
   valkey_data:
+    name: config_valkey_data
