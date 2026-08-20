@@ -66,7 +66,7 @@ help: ## Show this interactive help banner
 # Stack Lifecycle Management
 # ------------------------------------------------------------------------------
 .PHONY: up
-up: ## Start all core mesh services (App, PostgreSQL, Valkey) in background
+up: ## Start all core mesh services (App, Worker, PostgreSQL, Valkey) in background
 	@echo -e "$(BLUE)Starting services with $(CONTAINER_ENGINE)...$(NC)"
 	@$(COMPOSE_BASE) up -d
 	@echo -e "$(GREEN)✅ Stack running. API available at http://localhost:8000$(NC)"
@@ -76,6 +76,11 @@ up-dev: ## Rebuild and start container mesh in background with live volume mount
 	@echo -e "$(BLUE)Building and starting development stack...$(NC)"
 	@$(COMPOSE_BASE) up -d --build
 	@echo -e "$(GREEN)✅ Development stack started$(NC)"
+
+.PHONY: worker
+worker: ## Start or tail live logs of SAQ background worker container
+	@echo -e "$(BLUE)Tailing SAQ background worker logs...$(NC)"
+	@$(COMPOSE_BASE) logs -f --tail=100 worker
 
 .PHONY: down
 down: ## Stop and remove all containers and network mesh (preserves data volumes)
@@ -94,7 +99,7 @@ down-volumes: ## Stop stack and remove all persistent data volumes (CAUTION)
 down-check: ## Stop project and verify no lingering containers remain on host
 	@$(COMPOSE_BASE) down
 	@echo -e "$(YELLOW)Checking for remaining project containers...$(NC)"
-	@$(CONTAINER_ENGINE) ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E 'app|postgres|valkey|traefik' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
+	@$(CONTAINER_ENGINE) ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E 'app|worker|postgres|valkey|traefik' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
 
 .PHONY: stop
 stop: ## Stop all services or a specific target (e.g., make stop SERVICE=app)

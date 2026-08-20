@@ -98,6 +98,36 @@ services:
       - "traefik.enable=true"
       - "traefik.http.services.app.loadbalancer.server.port=8000"
 
+  # ── SAQ Background Worker ──────────────────────────────────────────────────
+  worker:
+    build:
+      context: ../backend
+      dockerfile: ../config/Containerfile
+    container_name: worker_app
+    restart: unless-stopped
+    command: ["python", "-m", "saq", "app.core.worker.worker_settings", "--workers", "4"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
+      - VALKEY_HOST=valkey-cache
+      - VALKEY_PORT=6379
+      - ENVIRONMENT=development
+      - APP_BASE_URL=http://localhost
+      - SECRET_KEY=${SECRET_KEY:-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    volumes:
+      - ../backend/src:/app/src:z
+      - ../backend/pyproject.toml:/app/pyproject.toml:z
+      - ../logs:/app/logs:z
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      valkey-cache:
+        condition: service_started
+    networks:
+      - platform_net
+
   # ── Vite frontend dev-server (optional — comment out for API-only work) ───
   frontend:
     image: docker.io/node:22-alpine
