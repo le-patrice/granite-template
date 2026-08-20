@@ -1,0 +1,59 @@
+[project]
+name = "enterprise-platform"
+version = "0.1.0"
+description = "Enterprise Litestar ASGI platform with clean architecture and Valkey caching"
+requires-python = ">=3.11"
+dependencies = [
+    "litestar[standard]>=2.10.0",
+    "granian>=1.5.0",
+    "msgspec>=0.18.6",
+    "advanced-alchemy>=0.19.0",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+    "valkey>=6.0.0",
+    "pydantic-settings>=2.3.0",
+    "structlog>=24.2.0",
+    "pwdlib[argon2]>=0.2.0",
+    "pyjwt>=2.8.0",
+    "rich>=13.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
+    "ruff>=0.5.0",
+    "copier>=9.2.0",
+    # Required for Alembic sync engine (env.py swaps asyncpg → psycopg2)
+    "psycopg2-binary>=2.9.0",
+]
+
+# Optional transport for real SMTP dispatch (mail.py falls back to smtplib if absent)
+smtp = [
+    "aiosmtplib>=3.0.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+# asyncio_mode = "auto" means every async def test_* is wrapped automatically.
+asyncio_mode = "auto"
+# Tell pytest where test files live and where to find the app package.
+testpaths = ["tests"]
+pythonpath = ["src"]
+# Treat warnings as errors for cleaner CI output.
+filterwarnings = [
+    "error",
+    # suppress noisy deprecation warnings from third-party libs and frameworks
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+    "ignore::litestar.exceptions.base_exceptions.LitestarWarning",
+    "ignore::litestar.exceptions.base_exceptions.LitestarDeprecationWarning",
+]
+markers = [
+    "slow: marks tests as slow (migration cycle tests — run with 'pytest -m slow')",
+]

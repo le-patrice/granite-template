@@ -1,0 +1,13 @@
+references/
+.env
+backups/*.sql.gz
+logs/*.log
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/node_modules/
+dist/
+.venv/
+.coverage
+htmlcov/
+*.egg-info/

@@ -1,0 +1,17 @@
+[Unit]
+Description=Valkey High-Performance In-Memory Store
+After=network-online.target local-fs.target
+
+[Container]
+ContainerName=valkey-cache
+Image=docker.io/valkey/valkey:8-alpine
+Network=platform.network
+PublishPort=6379:6379
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target default.target

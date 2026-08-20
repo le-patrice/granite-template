@@ -1,0 +1,19 @@
+[Unit]
+Description=Litestar Enterprise API
+After=postgres.service valkey.service
+
+[Container]
+ContainerName=api-backend
+Image=localhost/enterprise-platform:latest
+PublishPort=8000:8000
+Network=platform.network
+EnvironmentFile=/etc/platform/app.env
+Exec=granian --interface asgi app:app --host 0.0.0.0 --port 8000 --workers 4 --runtime-threads 2 --http auto --backlog 1024
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target default.target

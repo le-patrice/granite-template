@@ -1,0 +1,199 @@
+# =============================================================================
+# copier.yml — Project scaffolding definition
+#
+# Usage:
+#   copier copy gh:your-org/enterprise-platform my-new-project
+#   copier update   (inside an already-generated project)
+#
+# Variables are injected into every template file (*.jinja extension) and
+# any file/directory whose name contains {{ variable }} tokens.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# 1. Identity
+# ---------------------------------------------------------------------------
+
+project_name:
+  type: str
+  help: "Human-readable project name (e.g. Acme IoT Platform)"
+  default: "Enterprise Platform"
+
+author_name:
+  type: str
+  help: "Primary author / team name"
+  default: "Platform Team"
+
+author_email:
+  type: str
+  help: "Author contact email"
+  default: "team@example.com"
+
+project_description:
+  type: str
+  help: "One-line description shown in pyproject.toml and README"
+  default: "High-throughput IoT telemetry platform built with Litestar and TimescaleDB"
+
+python_version:
+  type: str
+  help: "Python version to target"
+  default: "3.11"
+  choices:
+    - "3.11"
+    - "3.12"
+    - "3.13"
+
+# ---------------------------------------------------------------------------
+# 2. Computed / derived variables (not prompted — set from answers above)
+# ---------------------------------------------------------------------------
+
+# project_slug: lower-case, hyphens — used in package names and image tags
+project_slug:
+  type: str
+  help: "URL/package slug (auto-derived from project_name — override if needed)"
+  default: "{{ project_name | lower | replace(' ', '-') | replace('_', '-') }}"
+
+# project_package: valid Python identifier — used in src/ directory and imports
+project_package:
+  type: str
+  help: "Python package name (auto-derived — override if needed)"
+  default: "{{ project_slug | replace('-', '_') }}"
+
+# ---------------------------------------------------------------------------
+# 3. Infrastructure choices
+# ---------------------------------------------------------------------------
+
+container_engine:
+  type: str
+  help: "Container engine (used in Makefile and compose commands)"
+  default: "podman"
+  choices:
+    - podman
+    - docker
+
+app_port:
+  type: int
+  help: "Host port to expose the backend API on"
+  default: 8000
+
+# ---------------------------------------------------------------------------
+# 4. Optional feature flags
+# ---------------------------------------------------------------------------
+
+include_frontend:
+  type: bool
+  help: "Include Vite + React frontend scaffold and Traefik routing?"
+  default: true
+
+include_timescaledb:
+  type: bool
+  help: "Use TimescaleDB-HA image (includes pgvector, PostGIS)?"
+  default: true
+
+include_pgvector:
+  type: bool
+  help: "Enable pgvector extension (vector similarity search / ML embeddings)?"
+  default: true
+
+include_traefik:
+  type: bool
+  help: "Include Traefik reverse proxy service in compose?"
+  default: true
+
+include_valkey:
+  type: bool
+  help: "Include Valkey (Redis-compatible) cache service?"
+  default: true
+
+include_mailpit:
+  type: bool
+  help: "Include Mailpit SMTP dev-server for email testing?"
+  default: false
+
+# ---------------------------------------------------------------------------
+# 5. Database configuration
+# ---------------------------------------------------------------------------
+
+postgres_user:
+  type: str
+  help: "PostgreSQL application user"
+  default: "{{ project_package }}_user"
+
+postgres_password:
+  type: str
+  help: "PostgreSQL application password (randomly generated if omitted)"
+  default: "{% for _ in range(32) %}{{ 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' | random }}{% endfor %}"
+
+postgres_db:
+  type: str
+  help: "PostgreSQL database name"
+  default: "{{ project_package }}_db"
+
+postgres_port:
+  type: int
+  help: "PostgreSQL host port binding"
+  default: 5432
+
+valkey_port:
+  type: int
+  help: "Valkey host port binding"
+  default: 6379
+
+# ---------------------------------------------------------------------------
+# 6. Security / secrets generation
+# ---------------------------------------------------------------------------
+
+secret_key:
+  type: str
+  help: "64-character hexadecimal SECRET_KEY for JWT signing (randomly generated if omitted)"
+  default: "{% for _ in range(64) %}{{ '0123456789abcdef' | random }}{% endfor %}"
+
+first_superuser_email:
+  type: str
+  help: "Initial superuser email address"
+  default: "admin@{{ project_slug }}.internal"
+
+first_superuser_password:
+  type: str
+  help: "Initial superuser password (randomly generated if omitted)"
+  default: "{% for _ in range(24) %}{{ 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*' | random }}{% endfor %}"
+
+# ---------------------------------------------------------------------------
+# Copier metadata
+# ---------------------------------------------------------------------------
+
+_subdirectory: "."
+_templates_suffix: ".jinja"
+
+_skip_if_exists:
+  - ".env"
+  - "backups/"
+  - "logs/"
+
+_exclude:
+  - "copier.yml"
+  - ".git"
+  - ".github"
+  - "references/"
+  - "**/__pycache__"
+  - "**/*.pyc"
+  - "**/.venv"
+  - "**/node_modules"
+  - "**/dist"
+
+_message_after_copy: |
+  ✅  {{ project_name }} scaffolded successfully!
+
+  Next steps:
+    1.  cd {{ project_slug }}
+    2.  cp .env.example .env   # fill in SECRET_KEY, passwords, SMTP
+    3.  make up                # start {{ container_engine }} stack
+    4.  make migrate           # apply Alembic migrations
+    5.  make seed              # create initial superuser
+    6.  open http://localhost{{ ":"+app_port|string if app_port != 80 else "" }}
+
+  Container engine: {{ container_engine }}
+  Frontend:         {{ "✓ included" if include_frontend else "✗ skipped" }}
+  TimescaleDB:      {{ "✓ included" if include_timescaledb else "✗ skipped (plain PostgreSQL)" }}
+  pgvector:         {{ "✓ included" if include_pgvector else "✗ skipped" }}
+  Traefik:          {{ "✓ included" if include_traefik else "✗ skipped" }}
+  Mailpit:          {{ "✓ included" if include_mailpit else "✗ skipped" }}

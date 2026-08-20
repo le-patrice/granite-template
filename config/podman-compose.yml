@@ -1,0 +1,153 @@
+# ===========================================================================
+# Development mesh  –  rootless Podman
+#
+# Services
+# --------
+#   traefik        port 80  — reverse proxy (API, docs, frontend)
+#                  port 8080 — Traefik dashboard (dev only)
+#   app            internal — Litestar / Granian backend (no direct host port)
+#   frontend       internal — Vite HMR dev-server (no direct host port)
+#   postgres-db    5432     — TimescaleDB + pgvector
+#   valkey-cache   6379     — Valkey key-value store
+#
+# Traffic flow
+# ------------
+#   browser → :80 (Traefik) ─┬─ /api/* /docs* /scalar* → app:8000
+#                             └─ /*                      → frontend:5173
+# ===========================================================================
+
+networks:
+  platform_net:
+    driver: bridge
+
+services:
+
+  # ── Traefik reverse proxy ──────────────────────────────────────────────────
+  traefik:
+    image: docker.io/traefik:v3.3
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:80"      # public HTTP / h2c entrypoint
+      - "${DASHBOARD_PORT:-8080}:8080"  # Traefik dashboard (dev only)
+    volumes:
+      # Podman rootless socket — expose it read-only for label discovery
+      - /run/user/${UID:-1000}/podman/podman.sock:/run/podman/podman.sock:ro
+      # Static configuration file
+      - ./traefik-dev.yml:/etc/traefik/traefik-dev.yml:ro
+    command:
+      - "--providers.file.filename=/etc/traefik/traefik-dev.yml"
+      - "--providers.docker.endpoint=unix:///run/podman/podman.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=platform_net"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=INFO"
+      - "--log.format=json"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+    networks:
+      - platform_net
+    depends_on:
+      - app
+
+  # ── Litestar backend ───────────────────────────────────────────────────────
+  app:
+    build:
+      context: ../backend
+      dockerfile: ../config/Containerfile
+    container_name: api_app
+    restart: unless-stopped
+    # No host-port binding — all traffic comes through Traefik
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
+      - VALKEY_HOST=valkey-cache
+      - VALKEY_PORT=6379
+      - ENVIRONMENT=development
+      - APP_BASE_URL=http://localhost
+      - SECRET_KEY=${SECRET_KEY:-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-admin@platform.internal}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-AdminSecurePassword2026!}
+      # SMTP: leave blank for structlog mock mode
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    volumes:
+      - ../backend/src:/app/src:z        # live-reload via Granian --reload
+      - ../backend/tests:/app/tests:z
+      - ../backend/scripts:/app/scripts:z
+      - ../backend/pyproject.toml:/app/pyproject.toml:z
+      - ../logs:/app/logs:z
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      valkey-cache:
+        condition: service_started
+    networks:
+      - platform_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.app.loadbalancer.server.port=8000"
+
+  # ── Vite frontend dev-server (optional — comment out for API-only work) ───
+  frontend:
+    image: docker.io/node:22-alpine
+    container_name: frontend_dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    expose:
+      - "5173"
+    volumes:
+      - ../frontend:/app:z
+    networks:
+      - platform_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=5173"
+
+  # ── TimescaleDB + pgvector ─────────────────────────────────────────────────
+  postgres-db:
+    image: docker.io/timescale/timescaledb-ha:pg16
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=app_user
+      - POSTGRES_PASSWORD=secure_dev_password
+      - POSTGRES_DB=app_db
+    volumes:
+      - pg_data:/var/lib/postgresql/data:Z
+    ports:
+      - "5432:5432"    # direct access for migrations & psql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U app_user -d app_db || exit 0"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - platform_net
+
+  # ── Valkey ────────────────────────────────────────────────────────────────
+  valkey-cache:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: valkey_cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data:Z
+    networks:
+      - platform_net
+
+volumes:
+  pg_data:
+  valkey_data:

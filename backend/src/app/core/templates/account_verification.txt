@@ -1,0 +1,14 @@
+{{APP_NAME}} — Verify Your Email Address
+=========================================
+
+Hi {{USER_NAME}},
+
+Thanks for signing up! Please verify your email address to activate your account.
+This link will expire in {{EXPIRES_HOURS}} hour(s).
+
+  {{VERIFY_URL}}
+
+If you did not sign up for this account, you can safely ignore this email.
+
+—
+{{APP_NAME}} Team

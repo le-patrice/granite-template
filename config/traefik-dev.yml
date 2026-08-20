@@ -1,0 +1,152 @@
+# ===========================================================================
+# Traefik v3 — development static configuration
+#
+# Loaded via --providers.file.filename=/etc/traefik/traefik-dev.yml inside
+# the Traefik container (see podman-compose.yml).
+#
+# Routing summary
+# ---------------
+#  /api/*   → app:8000   (Litestar JSON API)
+#  /docs*   → app:8000   (Scalar / Swagger UI — served by Litestar)
+#  /scalar* → app:8000
+#  /        → frontend:5173 in dev  (Vite HMR dev-server)
+#
+# Features
+# --------
+#  • HTTP/1.1 + HTTP/2 cleartext (h2c) on port 80 (TLS terminated upstream
+#    by your load-balancer in production; Traefik handles h2c in dev).
+#  • Global CORS middleware — avoids duplicating headers in every service.
+#  • Structured access-log in JSON for machine consumption.
+#  • Traefik dashboard exposed on :8080 (insecure, dev only).
+# ===========================================================================
+
+# ── Global daemon settings ──────────────────────────────────────────────────
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# ── Structured logging ──────────────────────────────────────────────────────
+log:
+  level: INFO            # DEBUG | INFO | WARN | ERROR
+  format: json           # json | common
+
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: drop
+      names:
+        X-Request-Id: keep
+        X-Forwarded-For: keep
+
+# ── API / Dashboard (dev only — never expose in production) ─────────────────
+api:
+  dashboard: true
+  insecure: true         # reachable at http://localhost:8080/dashboard/
+
+# ── Entry points ─────────────────────────────────────────────────────────────
+entryPoints:
+  web:
+    address: ":80"
+    # Enable HTTP/2 cleartext (h2c) so upstream gRPC / async clients work.
+    http2:
+      maxConcurrentStreams: 250
+
+# ── Providers: file (this file) + Docker labels ─────────────────────────────
+providers:
+  # Dynamic config from this very file (routers / services / middlewares)
+  file:
+    filename: /etc/traefik/traefik-dev.yml
+    watch: true          # hot-reload on save
+
+  # Container labels (podman-compose services)
+  docker:
+    endpoint: "unix:///run/podman/podman.sock"
+    exposedByDefault: false
+    network: platform_net
+
+# ── Middlewares ──────────────────────────────────────────────────────────────
+http:
+  middlewares:
+
+    # ── CORS — applied to every API route ──────────────────────────────────
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList:
+          - "http://localhost"
+          - "http://localhost:5173"   # Vite dev-server
+          - "http://localhost:3000"
+        accessControlMaxAge: 86400   # 24 h preflight cache
+        addVaryHeader: true
+
+    # ── Security headers — applied to every response ────────────────────────
+    secure-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "same-origin"
+        customResponseHeaders:
+          X-Powered-By: ""           # hide server fingerprint
+
+    # ── Strip /api prefix before forwarding (optional — disable if app reads /api) ─
+    # strip-api-prefix:
+    #   stripPrefix:
+    #     prefixes:
+    #       - "/api"
+
+    # ── Rate-limiting (dev: generous) ───────────────────────────────────────
+    rate-limit:
+      rateLimit:
+        average: 500
+        burst: 1000
+
+  # ── Routers ────────────────────────────────────────────────────────────────
+  routers:
+
+    # API + docs → Litestar app container
+    api-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`) || PathPrefix(`/health`)"
+      service: app-service
+      middlewares:
+        - cors-headers
+        - secure-headers
+        - rate-limit
+
+    # Root + everything else → Vite frontend dev-server
+    frontend-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/`)"
+      service: frontend-service
+      middlewares:
+        - secure-headers
+
+  # ── Backend services ───────────────────────────────────────────────────────
+  services:
+
+    # Litestar / Granian app
+    app-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://app:8000"
+
+    # Vite HMR dev-server (frontend container)
+    frontend-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://frontend:5173"

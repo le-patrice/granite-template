@@ -1,0 +1,46 @@
+# Stage 1: Build virtual environment with compilation tools
+FROM docker.io/library/python:3.11-slim AS builder
+
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ libffi-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir --user ".[dev]"
+
+# Stage 2: Minimal non-root runtime environment
+FROM docker.io/library/python:3.11-slim AS runner
+
+RUN useradd -u 10001 -m -s /bin/bash appuser
+WORKDIR /app
+
+COPY --from=builder /root/.local /home/appuser/.local
+COPY src /app/src
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
+COPY scripts /app/scripts
+COPY tests /app/tests
+COPY pyproject.toml /app/pyproject.toml
+
+# Create log directory and set permissions
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
+
+ENV PATH=/home/appuser/.local/bin:$PATH \
+    PYTHONPATH=/app/src \
+    PYTHONUNBUFFERED=1
+
+USER appuser
+EXPOSE 8000
+
+CMD [ \
+    "granian", \
+    "--interface",        "asgi", \
+    "app:app", \
+    "--host",             "0.0.0.0", \
+    "--port",             "8000", \
+    "--workers",          "4", \
+    "--runtime-threads",  "2", \
+    "--http",             "auto", \
+    "--backlog",          "1024", \
+    "--respawn-interval", "3" \
+]
