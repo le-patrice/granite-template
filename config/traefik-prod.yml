@@ -1,0 +1,125 @@
+# ===========================================================================
+# Traefik v3 — Production Static Configuration with Cloudflare Zero Trust Ingress
+# ===========================================================================
+
+# ── Global Daemon Settings ──────────────────────────────────────────────────
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# ── Structured Logging ──────────────────────────────────────────────────────
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: drop
+      names:
+        X-Request-Id: keep
+        X-Forwarded-For: keep
+        CF-Connecting-IP: keep
+        CF-Ray: keep
+        X-Forwarded-Proto: keep
+
+# ── Entry Points ─────────────────────────────────────────────────────────────
+entryPoints:
+  web:
+    address: ":80"
+    forwardedHeaders:
+      insecure: true     # Trust Cloudflare Tunnel proxy headers
+    http2:
+      maxConcurrentStreams: 500
+
+# ── Providers ───────────────────────────────────────────────────────────────
+providers:
+  file:
+    filename: /etc/traefik/traefik-prod.yml
+    watch: false
+
+# ── Middlewares & Routing ───────────────────────────────────────────────────
+http:
+  middlewares:
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlMaxAge: 86400
+        addVaryHeader: true
+
+    secure-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        customResponseHeaders:
+          X-Powered-By: ""
+
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+
+  routers:
+    # API Router
+    api-router:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`^{subdomain:(api|api-prod)\\..*}`) || PathPrefix(`/api`)"
+      service: app-service
+      middlewares:
+        - cors-headers
+        - secure-headers
+        - rate-limit
+
+    # Docs Router
+    docs-router:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`^{subdomain:(docs|docs-prod)\\..*}`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`)"
+      service: app-service
+      middlewares:
+        - cors-headers
+        - secure-headers
+
+    # Health & Metrics Router
+    health-metrics-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/health`) || PathPrefix(`/metrics`)"
+      service: app-service
+      middlewares:
+        - secure-headers
+
+    # Frontend SPA Router
+    frontend-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/`)"
+      service: frontend-service
+      middlewares:
+        - secure-headers
+
+  services:
+    app-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://app:8000"
+
+    frontend-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://frontend:80"

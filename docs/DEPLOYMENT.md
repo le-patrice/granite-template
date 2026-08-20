@@ -190,3 +190,66 @@ When an updated image tag is published to your OCI container registry, Podman pu
    - `:z` (Shared relabeling): Used for read-only mounts shared across multiple containers (e.g. source code volumes).
    - `:Z` (Private relabeling): Used for sensitive exclusive volumes (e.g. `pg_data`), ensuring only the database process can read or write raw database files.
 3. **Traefik Edge Ingress:** Exposes only port 80/443 to the internet. Internal service ports (8000, 5432, 6379) remain bound only to the private bridge network.
+
+---
+
+## 6. Cloudflare Zero Trust Tunnel Edge Ingress
+
+The platform includes first-class integration with **Cloudflare Zero Trust Tunnel** (`cloudflared`). In this architecture, no public firewall ports (80/443) need to be open on your host. Instead, an outbound encrypted tunnel connects your local Traefik instance directly to Cloudflare's global edge network.
+
+### Architecture Topology
+
+```mermaid
+flowchart LR
+    User[End User] -->|HTTPS| CFEdge[Cloudflare Global Edge]
+    CFEdge -->|Encrypted Tunnel| Tunnel[cloudflared container]
+    Tunnel -->|HTTP :80| Traefik[Traefik v3 Gateway]
+    Traefik -->|api.*, /api/*, /docs| App[Litestar Backend :8000]
+    Traefik -->|app.*, /*| Frontend[Frontend SPA :5173 / :80]
+```
+
+### Setup Guide: Cloudflare Zero Trust Dashboard
+
+1. **Create the Tunnel:**
+   - Log into the **Cloudflare Zero Trust Dashboard** $\rightarrow$ **Networks** $\rightarrow$ **Tunnels**.
+   - Click **Add a Tunnel**, choose **Cloudflared**, and name it `granite-prod` (or your project name).
+   - Under the install instructions, copy the **Tunnel Token** value.
+   - Paste the token into your `.env` file:
+     ```ini
+     CLOUDFLARED_TUNNEL_TOKEN=eyJhIjoiY2...
+     ```
+
+2. **Configure Public Hostnames (Edge Routing):**
+   - On the tunnel details page, navigate to the **Public Hostname** tab and click **Add a public hostname**.
+   - Map your desired subdomains directly to the internal **Traefik** reverse proxy:
+     - **Main Application:**
+       - Subdomain / Domain: `app.example.com` (or root `example.com`)
+       - Service Type: `HTTP`
+       - URL: `traefik:80` (or `http://traefik:80`)
+     - **API Service:**
+       - Subdomain: `api.example.com`
+       - Service Type: `HTTP`
+       - URL: `traefik:80`
+     - **Interactive API Documentation:**
+       - Subdomain: `docs.example.com`
+       - Service Type: `HTTP`
+       - URL: `traefik:80`
+
+3. **Traefik Fine-Grained Subdomain Routing:**
+   - Traefik inspects the incoming `Host` and `CF-Connecting-IP` headers and routes:
+     - `api.example.com` or `/api/*` $\rightarrow$ `app:8000`
+     - `docs.example.com` or `/docs`, `/scalar`, `/swagger` $\rightarrow$ `app:8000`
+     - `app.example.com` or `/*` $\rightarrow$ `frontend:5173` (or Nginx in production)
+
+4. **Lifecycle & Status Management:**
+   ```bash
+   # Check tunnel connection status
+   make tunnel-status
+
+   # Tail live logs from cloudflared
+   make tunnel-logs
+
+   # Restart the tunnel container
+   make tunnel-restart
+   ```
+

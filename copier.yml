@@ -146,6 +146,11 @@ include_frontend:
   help: "Include React + Vite + TypeScript frontend workspace with @hey-api auto-sync client"
   default: true
 
+include_cloudflare_tunnel:
+  type: bool
+  help: "Include Cloudflare Zero Trust Tunnel container for secure public ingress"
+  default: true
+
 # ------------------------------------------------------------------------------
 # Secrets & Credentials (Auto-Generated via Jinja on Copy)
 # ------------------------------------------------------------------------------

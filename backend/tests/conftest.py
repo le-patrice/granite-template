@@ -75,6 +75,19 @@ async def async_engine():
     await engine.dispose()
 
 
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def ensure_db_schema(async_engine):
+    """Ensure all SQLAlchemy declarative tables exist in database before running tests."""
+    from app.domain.base import Base
+    import app.domain.users.models  # noqa: F401
+    import app.domain.telemetry.models  # noqa: F401
+    import app.domain.events.models  # noqa: F401
+
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+
+
 # ---------------------------------------------------------------------------
 # Transactional rollback session — one per test function.
 # ---------------------------------------------------------------------------

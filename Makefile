@@ -59,6 +59,8 @@ help: ## Show this interactive help banner
 	@echo -e "  make metrics                      # Inspect Prometheus scrapable metrics endpoint"
 	@echo -e "  make outbox-relay                 # Trigger a sweep of pending transactional outbox events"
 	@echo -e "  make dlq-replay                   # Replay quarantined Dead Letter Queue events"
+	@echo -e "  make tunnel-status                # Check Cloudflare Zero Trust Tunnel container status"
+	@echo -e "  make tunnel-logs                  # Tail live logs from Cloudflare Tunnel container"
 	@echo -e "  make migrate                      # Run Alembic migrations inside app container"
 	@echo -e "  make seed                         # Seed initial superuser into database"
 	@echo -e "  make test                         # Run isolated pytest suite inside container"
@@ -298,6 +300,22 @@ frontend-sync: export-schema ## Compile TypeScript fetch client from exported Op
 	else \
 		echo -e "$(YELLOW)Frontend directory not present. Skipping TypeScript generation.$(NC)"; \
 	fi
+
+# ------------------------------------------------------------------------------
+# Cloudflare Tunnel
+# ------------------------------------------------------------------------------
+.PHONY: tunnel-status
+tunnel-status: ## Check Cloudflare Tunnel container health and status
+	@echo -e "$(YELLOW)Checking Cloudflare Tunnel status...$(NC)"
+	@$(COMPOSE_BASE) ps cloudflared
+
+.PHONY: tunnel-logs
+tunnel-logs: ## Tail live logs from the Cloudflare Tunnel container
+	@$(COMPOSE_BASE) logs -f --tail=200 cloudflared
+
+.PHONY: tunnel-restart
+tunnel-restart: ## Restart the Cloudflare Tunnel container
+	@$(COMPOSE_BASE) restart cloudflared
 
 # ------------------------------------------------------------------------------
 # Automated Testing

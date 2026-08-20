@@ -75,6 +75,19 @@ services:
     depends_on:
       - app
 
+  # ── Cloudflare Zero Trust Tunnel ───────────────────────────────────────────
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    container_name: cloudflared_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARED_TUNNEL_TOKEN:-}
+    depends_on:
+      - traefik
+    networks:
+      - platform_net
+
   # ── Litestar backend ───────────────────────────────────────────────────────
   app:
     build:
