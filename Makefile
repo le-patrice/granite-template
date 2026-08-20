@@ -286,10 +286,10 @@ db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups
 # Schema Sync & TypeScript Frontend Client Generation
 # ------------------------------------------------------------------------------
 .PHONY: export-schema
-export-schema: ## Export Litestar OpenAPI 3.1 schema to dist/openapi.json
+export-schema: ## Export Litestar OpenAPI 3.1 schema to frontend/openapi.json
 	@echo -e "$(YELLOW)Extracting OpenAPI schema...$(NC)"
 	@$(EXEC_APP) python scripts/export_schemas.py
-	@echo -e "$(GREEN)✅ Exported to dist/openapi.json$(NC)"
+	@echo -e "$(GREEN)✅ Exported to frontend/openapi.json$(NC)"
 
 .PHONY: frontend-sync
 frontend-sync: export-schema ## Compile TypeScript fetch client from exported OpenAPI schema

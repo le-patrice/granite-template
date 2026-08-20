@@ -205,25 +205,8 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   schema-drift:
     name: "Schema Drift Check (openapi-ts)"
-    needs: integration-tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    services:
-      postgres:
-        image: docker.io/timescale/timescaledb-ha:pg16
-        env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U app_user -d app_db"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 30s
+    timeout-minutes: 5
 
     steps:
       - name: Checkout Code
@@ -235,55 +218,36 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "backend/pyproject.toml"
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: "3.11"
 
-      - name: Set up Node.js ${{ env.NODE_VERSION }}
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: 22
           cache: "npm"
           cache-dependency-path: "frontend/package-lock.json"
 
-      - name: Install backend dependencies
-        working-directory: backend
-        run: uv sync --all-extras --dev
+      - name: Install Backend & Frontend Dependencies
+        run: |
+          cd backend && uv sync --dev
+          cd ../frontend && npm ci
 
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Apply migrations
+      - name: Export OpenAPI Schema
         working-directory: backend
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-        run: |
-          ALEMBIC_URL="${DATABASE_URL/postgresql+asyncpg/postgresql+psycopg2}"
-          uv run alembic -c alembic.ini upgrade head
+          PYTHONPATH: src
+          SECRET_KEY: test-secret-key-32-bytes-minimum-length-for-ci
+        run: uv run python scripts/export_schemas.py
 
-      - name: Export OpenAPI schema
-        working-directory: backend
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          SECRET_KEY: ${{ env.SECRET_KEY }}
-          ENVIRONMENT: ${{ env.ENVIRONMENT }}
-        run: python scripts/export_schemas.py
-
-      - name: Generate TypeScript client from schema
+      - name: Generate TypeScript Client from Schema
         working-directory: frontend
-        run: npm run generate-client
+        run: npx @hey-api/openapi-ts
 
-      - name: Assert no schema drift (uncommitted diff = fail)
-        run: |
-          git diff --exit-code -- frontend/src/client/ || {
-            echo ""
-            echo "❌ OpenAPI schema drift detected!"
-            echo "   The generated TypeScript client is out of sync with the backend."
-            echo "   Run 'make frontend-sync' then commit the updated client files."
-            exit 1
-          }
+      - name: Assert No Uncommitted Schema Drift
+        run: git diff --exit-code frontend/src/client
 
   # ═══════════════════════════════════════════════════════════════════════════
   # JOB 5: Container Image Build Verification

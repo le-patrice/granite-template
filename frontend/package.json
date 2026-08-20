@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "generate-client": "openapi-ts --input ../dist/openapi.json --output src/client --client @hey-api/client-fetch"
+    "generate-client": "openapi-ts --input openapi.json --output src/client --client @hey-api/client-fetch"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.3.0"

@@ -1,7 +1,9 @@
 references/
 .env
 backups/*.sql.gz
-logs/*.log
+logs/
+**/logs/
+backend/logs/
 **/__pycache__/
 **/.pytest_cache/
 **/.ruff_cache/

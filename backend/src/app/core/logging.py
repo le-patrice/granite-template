@@ -10,25 +10,28 @@ from app.core.settings import settings
 
 def setup_logging() -> None:
     log_dir = "logs"
-    os.makedirs(log_dir, exist_ok=True)
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            os.path.join(log_dir, "application.log"),
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5,
+            encoding="utf-8",
+        )
+        handlers.append(file_handler)
+    except OSError:
+        pass
 
     # Root standard logger configuration
     log_level = logging.DEBUG if settings.DEBUG else logging.INFO
 
-    # Rotating file handler for production archiving
-    file_handler = RotatingFileHandler(
-        os.path.join(log_dir, "application.log"),
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=5,
-        encoding="utf-8",
-    )
-
-    stream_handler = logging.StreamHandler(sys.stdout)
-
     logging.basicConfig(
         format="%(message)s",
         level=log_level,
-        handlers=[file_handler, stream_handler],
+        handlers=handlers,
+        force=True,
     )
 
     # Structlog processing pipeline
