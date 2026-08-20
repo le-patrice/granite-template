@@ -1,199 +1,170 @@
-# =============================================================================
-# copier.yml — Project scaffolding definition
-#
-# Usage:
-#   copier copy gh:your-org/enterprise-platform my-new-project
-#   copier update   (inside an already-generated project)
-#
-# Variables are injected into every template file (*.jinja extension) and
-# any file/directory whose name contains {{ variable }} tokens.
-# =============================================================================
+# ==============================================================================
+# LiteForge Boilerplate — Copier Scaffolding Definition
+# ==============================================================================
+_min_copier_version: "9.0.0"
+_subdirectory: ""
 
-# ---------------------------------------------------------------------------
-# 1. Identity
-# ---------------------------------------------------------------------------
-
+# ------------------------------------------------------------------------------
+# Project Identity & Metadata
+# ------------------------------------------------------------------------------
 project_name:
   type: str
-  help: "Human-readable project name (e.g. Acme IoT Platform)"
+  help: "Human-readable project name"
   default: "Enterprise Platform"
 
-author_name:
+project_slug:
   type: str
-  help: "Primary author / team name"
-  default: "Platform Team"
+  help: "Slugified project identifier (used for folders, images, network names)"
+  default: "{{ project_name|lower|replace(' ', '-')|replace('_', '-') }}"
 
-author_email:
+project_package:
   type: str
-  help: "Author contact email"
-  default: "team@example.com"
+  help: "Python package root module name"
+  default: "{{ project_slug|lower|replace('-', '_') }}"
 
 project_description:
   type: str
   help: "One-line description shown in pyproject.toml and README"
-  default: "High-throughput IoT telemetry platform built with Litestar and TimescaleDB"
+  default: "Enterprise Litestar ASGI platform with clean architecture, TimescaleDB, Valkey, and SAQ background workers"
+
+author_name:
+  type: str
+  help: "Author / Organization Name"
+  default: "Core Engineering Team"
+
+author_email:
+  type: str
+  help: "Maintainer contact email"
+  default: "admin@platform.internal"
+
+# ------------------------------------------------------------------------------
+# Runtimes & Infrastructure Engines
+# ------------------------------------------------------------------------------
+container_engine:
+  type: str
+  help: "Default container runtime engine"
+  choices:
+    - "podman"
+    - "docker"
+  default: "podman"
 
 python_version:
   type: str
-  help: "Python version to target"
-  default: "3.11"
+  help: "Target Python runtime"
   choices:
     - "3.11"
     - "3.12"
     - "3.13"
-
-# ---------------------------------------------------------------------------
-# 2. Computed / derived variables (not prompted — set from answers above)
-# ---------------------------------------------------------------------------
-
-# project_slug: lower-case, hyphens — used in package names and image tags
-project_slug:
-  type: str
-  help: "URL/package slug (auto-derived from project_name — override if needed)"
-  default: "{{ project_name | lower | replace(' ', '-') | replace('_', '-') }}"
-
-# project_package: valid Python identifier — used in src/ directory and imports
-project_package:
-  type: str
-  help: "Python package name (auto-derived — override if needed)"
-  default: "{{ project_slug | replace('-', '_') }}"
-
-# ---------------------------------------------------------------------------
-# 3. Infrastructure choices
-# ---------------------------------------------------------------------------
-
-container_engine:
-  type: str
-  help: "Container engine (used in Makefile and compose commands)"
-  default: "podman"
-  choices:
-    - podman
-    - docker
+  default: "3.11"
 
 app_port:
   type: int
-  help: "Host port to expose the backend API on"
+  help: "Public API port (host bound)"
   default: 8000
 
-# ---------------------------------------------------------------------------
-# 4. Optional feature flags
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Data Persistence, Search & Pooling
+# ------------------------------------------------------------------------------
+postgres_user:
+  type: str
+  help: "PostgreSQL root superuser username"
+  default: "app_user"
 
-include_frontend:
-  type: bool
-  help: "Include Vite + React frontend scaffold and Traefik routing?"
-  default: true
+postgres_db:
+  type: str
+  help: "Primary PostgreSQL database name"
+  default: "app_db"
+
+postgres_port:
+  type: int
+  help: "PostgreSQL port (host bound)"
+  default: 5432
 
 include_timescaledb:
   type: bool
-  help: "Use TimescaleDB-HA image (includes pgvector, PostGIS)?"
+  help: "Enable TimescaleDB engine for time-series telemetry hypertables & automated compression"
   default: true
 
 include_pgvector:
   type: bool
-  help: "Enable pgvector extension (vector similarity search / ML embeddings)?"
+  help: "Enable pgvector extension & HNSW indexing for AI semantic embeddings"
+  default: true
+
+include_pgbouncer:
+  type: bool
+  help: "Include PgBouncer connection pooler gateway container for high-concurrency scaling"
+  default: false
+
+# ------------------------------------------------------------------------------
+# Cache, Background Processing & Resilience
+# ------------------------------------------------------------------------------
+include_valkey:
+  type: bool
+  help: "Include Valkey in-memory store for session caching and hot-path state"
+  default: true
+
+include_distributed_worker:
+  type: bool
+  help: "Include SAQ async distributed background task worker & cron scheduler on Valkey"
+  default: true
+
+include_transactional_outbox:
+  type: bool
+  help: "Include Transactional Outbox pattern & Dead Letter Queue (DLQ) relay for guaranteed event delivery"
+  default: true
+
+include_idempotency_guard:
+  type: bool
+  help: "Include Valkey-backed Idempotency-Key validation middleware for transactional endpoints"
+  default: true
+
+include_rate_limiting:
+  type: bool
+  help: "Include sliding-window rate limiting middleware on public and auth endpoints"
+  default: true
+
+# ------------------------------------------------------------------------------
+# Observability, Edge Routing & UI
+# ------------------------------------------------------------------------------
+include_prometheus_metrics:
+  type: bool
+  help: "Expose /metrics endpoint for Prometheus scrapers & latency percentile tracking"
   default: true
 
 include_traefik:
   type: bool
-  help: "Include Traefik reverse proxy service in compose?"
-  default: true
-
-include_valkey:
-  type: bool
-  help: "Include Valkey (Redis-compatible) cache service?"
+  help: "Include Traefik v3 reverse proxy gateway for unified /api, /docs, and frontend routing"
   default: true
 
 include_mailpit:
   type: bool
-  help: "Include Mailpit SMTP dev-server for email testing?"
-  default: false
+  help: "Include Mailpit mock SMTP server container for local development email inspection"
+  default: true
 
-# ---------------------------------------------------------------------------
-# 5. Database configuration
-# ---------------------------------------------------------------------------
+include_frontend:
+  type: bool
+  help: "Include React + Vite + TypeScript frontend workspace with @hey-api auto-sync client"
+  default: true
 
-postgres_user:
+# ------------------------------------------------------------------------------
+# Secrets & Credentials (Auto-Generated via Jinja on Copy)
+# ------------------------------------------------------------------------------
+secret_key:
   type: str
-  help: "PostgreSQL application user"
-  default: "{{ project_package }}_user"
+  help: "Application JWT signing secret key (64-hex char recommended)"
+  default: "{{ 9999999999999999999999999999999999999999999999999999999999999999 | random | string | hash('sha256') }}"
 
 postgres_password:
   type: str
-  help: "PostgreSQL application password (randomly generated if omitted)"
-  default: "{% for _ in range(32) %}{{ 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' | random }}{% endfor %}"
-
-postgres_db:
-  type: str
-  help: "PostgreSQL database name"
-  default: "{{ project_package }}_db"
-
-postgres_port:
-  type: int
-  help: "PostgreSQL host port binding"
-  default: 5432
-
-valkey_port:
-  type: int
-  help: "Valkey host port binding"
-  default: 6379
-
-# ---------------------------------------------------------------------------
-# 6. Security / secrets generation
-# ---------------------------------------------------------------------------
-
-secret_key:
-  type: str
-  help: "64-character hexadecimal SECRET_KEY for JWT signing (randomly generated if omitted)"
-  default: "{% for _ in range(64) %}{{ '0123456789abcdef' | random }}{% endfor %}"
+  help: "PostgreSQL superuser password (auto-generated alphanumeric)"
+  default: "dev_{{ 9999999999999999 | random | string | hash('sha256') | truncate(20, True, '') }}"
 
 first_superuser_email:
   type: str
   help: "Initial superuser email address"
-  default: "admin@{{ project_slug }}.internal"
+  default: "admin@platform.internal"
 
 first_superuser_password:
   type: str
-  help: "Initial superuser password (randomly generated if omitted)"
-  default: "{% for _ in range(24) %}{{ 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*' | random }}{% endfor %}"
-
-# ---------------------------------------------------------------------------
-# Copier metadata
-# ---------------------------------------------------------------------------
-
-_subdirectory: "."
-_templates_suffix: ".jinja"
-
-_skip_if_exists:
-  - ".env"
-  - "backups/"
-  - "logs/"
-
-_exclude:
-  - "copier.yml"
-  - ".git"
-  - ".github"
-  - "references/"
-  - "**/__pycache__"
-  - "**/*.pyc"
-  - "**/.venv"
-  - "**/node_modules"
-  - "**/dist"
-
-_message_after_copy: |
-  ✅  {{ project_name }} scaffolded successfully!
-
-  Next steps:
-    1.  cd {{ project_slug }}
-    2.  cp .env.example .env   # fill in SECRET_KEY, passwords, SMTP
-    3.  make up                # start {{ container_engine }} stack
-    4.  make migrate           # apply Alembic migrations
-    5.  make seed              # create initial superuser
-    6.  open http://localhost{{ ":"+app_port|string if app_port != 80 else "" }}
-
-  Container engine: {{ container_engine }}
-  Frontend:         {{ "✓ included" if include_frontend else "✗ skipped" }}
-  TimescaleDB:      {{ "✓ included" if include_timescaledb else "✗ skipped (plain PostgreSQL)" }}
-  pgvector:         {{ "✓ included" if include_pgvector else "✗ skipped" }}
-  Traefik:          {{ "✓ included" if include_traefik else "✗ skipped" }}
-  Mailpit:          {{ "✓ included" if include_mailpit else "✗ skipped" }}
+  help: "Initial superuser login password (auto-generated)"
+  default: "Admin!{{ 9999999999999999 | random | string | hash('sha256') | truncate(16, True, '') }}"

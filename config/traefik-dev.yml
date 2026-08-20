@@ -118,7 +118,7 @@ http:
     api-router:
       entryPoints:
         - web
-      rule: "PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`) || PathPrefix(`/health`)"
+      rule: "PathPrefix(`/api`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`) || PathPrefix(`/health`) || PathPrefix(`/metrics`)"
       service: app-service
       middlewares:
         - cors-headers

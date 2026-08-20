@@ -22,6 +22,29 @@ networks:
 
 services:
 
+  # ── PgBouncer Connection Pooler (Transaction Pooling Gateway) ──────────────
+  pgbouncer:
+    image: docker.io/edoburu/pgbouncer:latest
+    container_name: pgbouncer_pool
+    restart: unless-stopped
+    expose:
+      - "6432"
+    environment:
+      - DB_USER=app_user
+      - DB_PASSWORD=secure_dev_password
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_NAME=app_db
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=25
+      - AUTH_TYPE=scram-sha-256
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - platform_net
+
   # ── Traefik reverse proxy ──────────────────────────────────────────────────
   traefik:
     image: docker.io/traefik:v3.3
