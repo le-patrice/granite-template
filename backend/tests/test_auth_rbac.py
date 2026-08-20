@@ -10,10 +10,10 @@ Tests:
    - Superadmin -> 200/201 Success on admin routes
 4. User role updates and admin deletion.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -78,7 +78,9 @@ class TestOAuth2LoginFlow:
 class TestSuperadminRBAC:
     async def test_unauthenticated_admin_endpoints_return_401(self, async_client: AsyncClient):
         # POST /users
-        resp = await async_client.post("/api/v1/users", json={"email": "a@b.com", "password": "1", "full_name": "A"})
+        resp = await async_client.post(
+            "/api/v1/users", json={"email": "a@b.com", "password": "1", "full_name": "A"}
+        )
         assert resp.status_code == 401
 
         # GET /users

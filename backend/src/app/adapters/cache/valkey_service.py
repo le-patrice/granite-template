@@ -14,6 +14,7 @@ get_transformer_state(transformer_id)
     Deserialise and return the cached TelemetryRecord, or None if the
     key has expired / never been set.
 """
+
 import msgspec
 from litestar.stores.valkey import ValkeyStore
 

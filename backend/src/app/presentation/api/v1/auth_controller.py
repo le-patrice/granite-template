@@ -5,7 +5,9 @@ POST /api/v1/auth/login   – OAuth2 & JSON password exchange → JWT bearer tok
 POST /api/v1/auth/token   – OAuth2 standard alias
 POST /api/v1/auth/logout  – invalidate current session token (JWT required)
 """
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
+from typing import ClassVar
 
 from litestar import Controller, post
 from litestar.connection import Request
@@ -33,7 +35,7 @@ async def provide_user_repo(db_session: AsyncSession) -> IUserRepository:
 
 class AuthController(Controller):
     path = "/auth"
-    dependencies = {"user_repo": Provide(provide_user_repo)}
+    dependencies: ClassVar[dict[str, Provide]] = {"user_repo": Provide(provide_user_repo)}
 
     @post(
         path=["/login", "/token"],
@@ -47,7 +49,10 @@ class AuthController(Controller):
         user_repo: IUserRepository,
     ) -> TokenResponse:
         content_type = request.content_type[0] if request.content_type else ""
-        if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        if (
+            "application/x-www-form-urlencoded" in content_type
+            or "multipart/form-data" in content_type
+        ):
             form = await request.form()
             email_or_user = form.get("username") or form.get("email") or ""
             password = form.get("password") or ""
@@ -56,7 +61,7 @@ class AuthController(Controller):
                 body = await request.json()
                 email_or_user = body.get("email") or body.get("username") or ""
                 password = body.get("password") or ""
-            except Exception:
+            except Exception:  # noqa: BLE001
                 raise NotAuthorizedException("Invalid login credentials format.")
 
         if not email_or_user or not password:
@@ -89,12 +94,12 @@ class AuthController(Controller):
     async def logout(self, request: Request) -> dict:
         jti: str = request.scope.get("token_jti", "")
         auth_header = request.headers.get("Authorization", "")
-        token = auth_header[len("Bearer "):]
+        token = auth_header[len("Bearer ") :]
         try:
             payload = decode_access_token(token)
             exp = payload.get("exp", 0)
-            remaining = max(1, int(exp - datetime.now(timezone.utc).timestamp()))
-        except Exception:
+            remaining = max(1, int(exp - datetime.now(UTC).timestamp()))
+        except Exception:  # noqa: BLE001
             remaining = 3600  # fallback: 1 h
 
         if jti:

@@ -7,25 +7,24 @@ Comprehensive test suite for enterprise resilience layers:
 - Transactional Outbox & Dead Letter Queue (DLQ)
 - Hybrid Search Reciprocal Rank Fusion (RRF)
 """
+
 from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.outbox.relay import OutboxRelay, PostgresOutboxRepository
-from app.adapters.postgres.search_utils import hybrid_search_rrf
 from app.core.circuit_breaker import CircuitBreaker, CircuitOpenException, CircuitState
 from app.domain.events.models import OutboxStatus
-
 
 # ---------------------------------------------------------------------------
 # 1. Three-Stage Health Probes Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 class TestHealthProbes:
@@ -53,6 +52,7 @@ class TestHealthProbes:
 # 2. Prometheus Metrics Endpoint Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 class TestMetricsEndpoint:
     async def test_metrics_endpoint_returns_prometheus_format(self, async_client: AsyncClient):
@@ -66,6 +66,7 @@ class TestMetricsEndpoint:
 # ---------------------------------------------------------------------------
 # 3. Circuit Breaker State Machine Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 class TestCircuitBreaker:
@@ -112,6 +113,7 @@ class TestCircuitBreaker:
 # 4. Idempotency Key Middleware Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 class TestIdempotency:
     async def test_idempotent_duplicate_request(self, async_client: AsyncClient):
@@ -149,11 +151,12 @@ class TestIdempotency:
 # 5. Transactional Outbox & DLQ Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 class TestTransactionalOutbox:
     async def test_outbox_lifecycle_and_dlq(self, db_session: AsyncSession):
         repo = PostgresOutboxRepository(db_session)
-        relay = OutboxRelay(repo)
+        OutboxRelay(repo)
 
         # 1. Create outbox event
         event = await repo.create_event(

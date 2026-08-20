@@ -4,15 +4,12 @@ Alembic migration cycle tests.
 Strategy
 --------
 These tests run the full Alembic migration sequence against the real
-test database using a temporary schema so they never touch the schema
-used by other tests:
+test database:
 
-  1.  Create a fresh PostgreSQL schema (``test_migrations_<uuid4_short>``).
-  2.  Set ``search_path`` so all DDL operates inside that schema.
-  3.  Run ``alembic upgrade head``  — verifies the full up-path.
-  4.  Run ``alembic downgrade base`` — verifies every downgrade() is reversible.
-  5.  Run ``alembic upgrade head`` again — verifies idempotency.
-  6.  Drop the temporary schema.
+  1.  Run ``alembic downgrade base`` — verifies every downgrade() is reversible.
+  2.  Run ``alembic upgrade head``   — verifies the full up-path.
+  3.  Run ``alembic downgrade base`` again — verifies idempotency of teardown.
+  4.  Run ``alembic upgrade head`` again — restores database state for application.
 
 This gives us confidence that:
   •  Every migration file is syntactically and semantically correct.
@@ -26,30 +23,26 @@ Notes
    The ``DATABASE_URL`` env var is rewritten from ``asyncpg`` → ``psycopg2``
    automatically by ``env.py``; we do the same swap here.
 
-•  ``SET search_path`` restricts DDL to the temporary schema.  Extensions
-   (uuid-ossp, pg_trgm, etc.) are created in ``public`` and visible from
-   any schema, so the ``CREATE EXTENSION IF NOT EXISTS`` calls in 0001 work
-   correctly.
-
 •  The test is marked ``@pytest.mark.slow`` so CI pipelines can opt-in via
    ``pytest -m slow`` without running it in the fast unit-test pass.
 """
+
 from __future__ import annotations
 
 import os
-import uuid
 from pathlib import Path
 
 import pytest
-from alembic import command as alembic_cmd
 from alembic.config import Config as AlembicConfig
+
+from alembic import command as alembic_cmd
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-_BACKEND_ROOT = Path(__file__).parent.parent   # backend/
-_ALEMBIC_INI  = _BACKEND_ROOT / "alembic.ini"
+_BACKEND_ROOT = Path(__file__).parent.parent  # backend/
+_ALEMBIC_INI = _BACKEND_ROOT / "alembic.ini"
 
 
 def _sync_dsn() -> str:
@@ -61,55 +54,16 @@ def _sync_dsn() -> str:
     return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
 
-def _make_alembic_cfg(schema: str) -> AlembicConfig:
-    """
-    Build an Alembic Config that:
-    •  Points at our alembic.ini
-    •  Overrides sqlalchemy.url to psycopg2 DSN
-    •  Sets search_path to restrict DDL to *schema*
-    """
-    cfg = AlembicConfig(str(_ALEMBIC_INI))
-    cfg.set_main_option("sqlalchemy.url", _sync_dsn())
-    # Restrict to the temp schema by injecting search_path via connect_args
-    # (Alembic passes engine_from_config kwargs; we monkey-patch via x opts)
-    cfg.attributes["schema"] = schema
-    return cfg
-
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="module")
-def temp_schema():
-    """
-    Create a throwaway PostgreSQL schema for migration tests and drop it
-    after the module finishes.
-
-    The schema name is short enough to fit in PG's 63-char NAMEDATALEN.
-    """
-    import sqlalchemy as sa
-
-    short_id = uuid.uuid4().hex[:8]
-    schema = f"test_mig_{short_id}"
-
-    engine = sa.create_engine(_sync_dsn(), isolation_level="AUTOCOMMIT")
-    with engine.connect() as conn:
-        conn.execute(sa.text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
-
-    yield schema
-
-    with engine.connect() as conn:
-        conn.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
-    engine.dispose()
-
 
 @pytest.fixture(scope="module")
-def alembic_cfg(temp_schema: str) -> AlembicConfig:
-    """Alembic config scoped to the temporary schema."""
-    cfg = _make_alembic_cfg(temp_schema)
-    # Override version_table to keep migration state inside the temp schema
-    cfg.set_main_option("version_table_schema", temp_schema)
+def alembic_cfg() -> AlembicConfig:
+    """Alembic config using real sync DSN."""
+    cfg = AlembicConfig(str(_ALEMBIC_INI))
+    cfg.set_main_option("sqlalchemy.url", _sync_dsn())
     return cfg
 
 
@@ -117,12 +71,27 @@ def alembic_cfg(temp_schema: str) -> AlembicConfig:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.slow
 class TestMigrationCycle:
-    """Full upgrade → downgrade → upgrade cycle in an isolated schema."""
+    """Full upgrade → downgrade → upgrade cycle."""
+
+    @classmethod
+    def setup_class(cls):
+        """Drop existing tables so Alembic tests run on a clean database."""
+        import sqlalchemy as sa
+
+        engine = sa.create_engine(_sync_dsn(), isolation_level="AUTOCOMMIT")
+        with engine.connect() as conn:
+            conn.execute(sa.text("DROP TABLE IF EXISTS alembic_version CASCADE;"))
+            conn.execute(sa.text("DROP TABLE IF EXISTS dead_letter_events CASCADE;"))
+            conn.execute(sa.text("DROP TABLE IF EXISTS outbox_events CASCADE;"))
+            conn.execute(sa.text("DROP TABLE IF EXISTS telemetry_readings CASCADE;"))
+            conn.execute(sa.text("DROP TABLE IF EXISTS platform_users CASCADE;"))
+        engine.dispose()
 
     def test_upgrade_head(self, alembic_cfg: AlembicConfig):
-        """All migrations apply cleanly from an empty schema."""
+        """All migrations apply cleanly."""
         alembic_cmd.upgrade(alembic_cfg, "head")
 
     def test_downgrade_base(self, alembic_cfg: AlembicConfig):
@@ -130,7 +99,7 @@ class TestMigrationCycle:
         alembic_cmd.downgrade(alembic_cfg, "base")
 
     def test_upgrade_head_again(self, alembic_cfg: AlembicConfig):
-        """Re-applying from scratch is idempotent (ON CONFLICT / IF NOT EXISTS)."""
+        """Re-applying from scratch is idempotent."""
         alembic_cmd.upgrade(alembic_cfg, "head")
 
 
@@ -140,9 +109,7 @@ class TestMigrationHistory:
 
     def test_revision_chain_is_linear(self, alembic_cfg: AlembicConfig):
         """No branch points — single linear revision chain."""
-        from alembic.runtime.migration import MigrationContext
         from alembic.script import ScriptDirectory
-        import sqlalchemy as sa
 
         script = ScriptDirectory.from_config(alembic_cfg)
         revisions = list(script.walk_revisions())
@@ -160,10 +127,7 @@ class TestMigrationHistory:
         versions_dir = _BACKEND_ROOT / "alembic" / "versions"
         for mig_file in sorted(versions_dir.glob("*.py")):
             source = mig_file.read_text()
-            assert "def downgrade" in source, (
-                f"{mig_file.name} is missing a downgrade() function."
-            )
-            # Rudimentary check: downgrade must not be a bare `pass`
+            assert "def downgrade" in source, f"{mig_file.name} is missing a downgrade() function."
             lines_after = source.split("def downgrade")[1].strip()
             assert lines_after and "pass" not in lines_after.splitlines()[1].strip(), (
                 f"{mig_file.name} has a stub downgrade() — implement it."

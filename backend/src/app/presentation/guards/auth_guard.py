@@ -12,9 +12,8 @@ Guards
    • Validates superadmin privileges (is_superuser=True)
    • Raises 401 if unauthenticated, 403 Forbidden if not superuser
 """
-from __future__ import annotations
 
-from typing import Any
+from __future__ import annotations
 
 from litestar.connection import ASGIConnection
 from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
@@ -41,12 +40,12 @@ class JWTAuthGuard:
                 "Expected: 'Authorization: Bearer <token>'"
             )
 
-        token = auth_header[len("Bearer "):]
+        token = auth_header[len("Bearer ") :]
 
         # Decode & validate JWT (signature + expiry)
         try:
             payload = decode_access_token(token)
-        except Exception:
+        except Exception:  # noqa: BLE001
             raise NotAuthorizedException("Invalid or expired session token.")
 
         user_id: str | None = payload.get("sub")
@@ -58,9 +57,7 @@ class JWTAuthGuard:
 
         # Revocation check via Valkey
         if jti and await is_token_revoked(jti):
-            raise NotAuthorizedException(
-                "This session has been revoked. Please log in again."
-            )
+            raise NotAuthorizedException("This session has been revoked. Please log in again.")
 
         # Inject identity into scope and connection
         connection.scope["user_id"] = user_id

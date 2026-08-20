@@ -25,11 +25,13 @@ autocommit / expire_on_commit=False
     Each handler gets a clean session; objects remain usable after commit
     (important for msgspec serialisation in the response phase).
 """
+
 from advanced_alchemy.config import AsyncSessionConfig, EngineConfig
 from advanced_alchemy.extensions.litestar.plugins import (
     SQLAlchemyAsyncConfig,
     SQLAlchemyInitPlugin,
 )
+
 from app.core.settings import settings
 
 db_config = SQLAlchemyAsyncConfig(

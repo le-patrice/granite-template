@@ -37,6 +37,7 @@ Dependencies (add to pyproject.toml when enabling real SMTP):
 Reference: references/litestar-fullstack/src/py/app/lib/email/service.py
            references/fastapi-template/backend/app/utils.py
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -47,7 +48,6 @@ from datetime import timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Optional
 
 import structlog
 
@@ -61,7 +61,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
-_HTML_TAG_RE  = re.compile(r"<[^<]+?>")
+_HTML_TAG_RE = re.compile(r"<[^<]+?>")
 _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
 
@@ -76,8 +76,10 @@ def _render(template_name: str, context: dict[str, str | int]) -> str:
     """Substitute {{PLACEHOLDER}} tokens in a template string."""
     source = _load_template(template_name)
     full_context = {"APP_NAME": settings.APP_NAME, **context}
+
     def replacer(m: re.Match) -> str:
         return str(full_context.get(m.group(1), m.group(0)))
+
     return _PLACEHOLDER_RE.sub(replacer, source)
 
 
@@ -85,7 +87,11 @@ def _html_to_text(html: str) -> str:
     """Strip HTML tags and normalise whitespace for the plain-text part."""
     text = _HTML_TAG_RE.sub("", html)
     for entity, char in (
-        ("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'),
+        ("&nbsp;", " "),
+        ("&amp;", "&"),
+        ("&lt;", "<"),
+        ("&gt;", ">"),
+        ("&quot;", '"'),
     ):
         text = text.replace(entity, char)
     return re.sub(r"\s+", " ", text).strip()
@@ -95,27 +101,27 @@ def _html_to_text(html: str) -> str:
 # Email message dataclass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EmailMessage:
     to_address: str
     subject: str
     html_body: str
-    text_body: Optional[str] = None       # auto-generated from html_body if None
-    from_address: Optional[str] = None    # falls back to settings.EMAILS_FROM_ADDRESS
-    reply_to: Optional[str] = None
+    text_body: str | None = None  # auto-generated from html_body if None
+    from_address: str | None = None  # falls back to settings.EMAILS_FROM_ADDRESS
+    reply_to: str | None = None
 
     def __post_init__(self) -> None:
         if self.text_body is None:
             self.text_body = _html_to_text(self.html_body)
         if self.from_address is None:
-            self.from_address = (
-                f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_ADDRESS}>"
-            )
+            self.from_address = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_ADDRESS}>"
 
 
 # ---------------------------------------------------------------------------
 # Transport
 # ---------------------------------------------------------------------------
+
 
 async def _send_smtp(msg: EmailMessage) -> None:
     """
@@ -128,8 +134,8 @@ async def _send_smtp(msg: EmailMessage) -> None:
     """
     mime = MIMEMultipart("alternative")
     mime["Subject"] = msg.subject
-    mime["From"]    = msg.from_address or settings.EMAILS_FROM_ADDRESS
-    mime["To"]      = msg.to_address
+    mime["From"] = msg.from_address or settings.EMAILS_FROM_ADDRESS
+    mime["To"] = msg.to_address
     if msg.reply_to:
         mime["Reply-To"] = msg.reply_to
 
@@ -138,6 +144,7 @@ async def _send_smtp(msg: EmailMessage) -> None:
 
     try:
         import aiosmtplib  # optional dep
+
         await aiosmtplib.send(
             mime,
             hostname=settings.SMTP_HOST,
@@ -177,6 +184,7 @@ async def _send_mock(msg: EmailMessage) -> None:
 # Public interface
 # ---------------------------------------------------------------------------
 
+
 class MailService:
     """
     Async email dispatcher with automatic mock fallback.
@@ -212,9 +220,7 @@ class MailService:
     ) -> None:
         """Render and dispatch a password-reset email."""
         expires_hours = max(1, settings.RESET_TOKEN_EXPIRE_MINUTES // 60)
-        reset_url = (
-            f"{settings.APP_BASE_URL}/reset-password?token={reset_token}"
-        )
+        reset_url = f"{settings.APP_BASE_URL}/reset-password?token={reset_token}"
         html = _render(
             "password_reset.html",
             {
@@ -248,9 +254,7 @@ class MailService:
     ) -> None:
         """Render and dispatch an account-verification email."""
         expires_hours = max(1, settings.VERIFY_TOKEN_EXPIRE_MINUTES // 60)
-        verify_url = (
-            f"{settings.APP_BASE_URL}/verify-email?token={verify_token}"
-        )
+        verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verify_token}"
         html = _render(
             "account_verification.html",
             {
@@ -280,6 +284,7 @@ class MailService:
 # ---------------------------------------------------------------------------
 # Token helpers (signed JWTs, validated by security.decode_access_token)
 # ---------------------------------------------------------------------------
+
 
 def generate_reset_token(user_email: str) -> str:
     """Return a short-lived password-reset JWT scoped to *user_email*."""

@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+
 import msgspec
 
 
@@ -27,16 +27,18 @@ class UserRead(msgspec.Struct, frozen=True):
 
 class UserUpdate(msgspec.Struct, frozen=True):
     """Partial update payload for own profile — all fields optional."""
-    full_name: Optional[str] = None
-    password: Optional[str] = None
+
+    full_name: str | None = None
+    password: str | None = None
 
 
 class UserAdminUpdate(msgspec.Struct, frozen=True):
     """Superadmin update payload for managing users & roles."""
-    full_name: Optional[str] = None
-    password: Optional[str] = None
-    is_active: Optional[bool] = None
-    is_superuser: Optional[bool] = None
+
+    full_name: str | None = None
+    password: str | None = None
+    is_active: bool | None = None
+    is_superuser: bool | None = None
 
 
 class TokenResponse(msgspec.Struct, frozen=True):
@@ -46,6 +48,6 @@ class TokenResponse(msgspec.Struct, frozen=True):
 
 
 class LoginRequest(msgspec.Struct, frozen=True):
-    email: Optional[str] = None
-    username: Optional[str] = None
+    email: str | None = None
+    username: str | None = None
     password: str = ""

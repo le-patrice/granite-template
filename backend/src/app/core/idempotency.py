@@ -12,10 +12,11 @@ Lifecycle:
    - If not found: records state as 'IN_PROGRESS' with a 30s lock TTL, processes the
      request, and stores the resulting response with a 24-hour TTL (86400s).
 """
+
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any
 
 import structlog
 from litestar.datastructures import MutableScopeHeaders
@@ -64,7 +65,9 @@ class IdempotencyMiddleware(AbstractMiddleware):
                         await self._send_json_response(
                             send,
                             status_code=HTTP_409_CONFLICT,
-                            payload={"detail": "A request with this Idempotency-Key is currently in progress."},
+                            payload={
+                                "detail": "A request with this Idempotency-Key is currently in progress."
+                            },
                         )
                         return
 
@@ -77,8 +80,8 @@ class IdempotencyMiddleware(AbstractMiddleware):
                 # Acquire in-flight lock
                 in_progress_record = json.dumps({"status": "IN_PROGRESS"})
                 await valkey_client.set(cache_key, in_progress_record, ex=LOCK_TTL_SECONDS)
-            except Exception as exc:
-                logger.warn("idempotency.valkey_error", error=str(exc))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("idempotency.valkey_error", error=str(exc))
 
         # Capture response body and status
         response_status = 200
@@ -104,7 +107,7 @@ class IdempotencyMiddleware(AbstractMiddleware):
             if valkey_client is not None:
                 try:
                     await valkey_client.delete(cache_key)
-                except Exception:
+                except Exception:  # noqa: S110, BLE001
                     pass
             raise
 
@@ -124,19 +127,20 @@ class IdempotencyMiddleware(AbstractMiddleware):
                     "body": full_body,
                 }
                 await valkey_client.set(cache_key, json.dumps(record), ex=IDEMPOTENCY_TTL_SECONDS)
-            except Exception as exc:
-                logger.warn("idempotency.cache_save_error", error=str(exc))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("idempotency.cache_save_error", error=str(exc))
 
     async def _get_valkey(self) -> Any:
         try:
             import valkey.asyncio as valkey
+
             return valkey.Valkey(
                 host=settings.VALKEY_HOST,
                 port=settings.VALKEY_PORT,
                 decode_responses=True,
                 socket_timeout=2.0,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     async def _send_json_response(self, send: Send, status_code: int, payload: dict) -> None:
@@ -150,16 +154,15 @@ class IdempotencyMiddleware(AbstractMiddleware):
 
     async def _send_cached_response(self, send: Send, record: dict) -> None:
         body = record.get("body", "").encode("utf-8")
-        headers = [
-            (k.encode("latin-1"), v.encode("latin-1"))
-            for k, v in record.get("headers", [])
-        ]
+        headers = [(k.encode("latin-1"), v.encode("latin-1")) for k, v in record.get("headers", [])]
         headers.append((b"x-cache-idempotent", b"HIT"))
         headers.append((b"content-length", str(len(body)).encode("ascii")))
 
-        await send({
-            "type": "http.response.start",
-            "status": record.get("status_code", 200),
-            "headers": headers,
-        })
+        await send(
+            {
+                "type": "http.response.start",
+                "status": record.get("status_code", 200),
+                "headers": headers,
+            }
+        )
         await send({"type": "http.response.body", "body": body, "more_body": False})

@@ -4,10 +4,10 @@ Prometheus Metrics & Observability Collector.
 Exposes standard Prometheus metric formats on `GET /metrics` and includes
 an ASGI middleware to record request counts and duration percentiles.
 """
+
 from __future__ import annotations
 
 import time
-from typing import Any
 
 from litestar import get
 from litestar.enums import ScopeType
@@ -56,6 +56,7 @@ TELEMETRY_INGEST_RECORDS_TOTAL = Counter(
 # Metrics Middleware
 # ---------------------------------------------------------------------------
 
+
 class PrometheusMetricsMiddleware(AbstractMiddleware):
     """ASGI Middleware to capture request count & latency metrics."""
 
@@ -103,6 +104,7 @@ class PrometheusMetricsMiddleware(AbstractMiddleware):
 # ---------------------------------------------------------------------------
 # Route Handler: GET /metrics
 # ---------------------------------------------------------------------------
+
 
 @get(
     path="/metrics",

@@ -4,13 +4,12 @@ Transactional Outbox Event Relay and Dead Letter Queue (DLQ) dispatcher.
 Reads pending events from PostgreSQL `outbox_events`, dispatches to Valkey
 streams/pubsub, and quarantines persistent failures into `dead_letter_events`.
 """
+
 from __future__ import annotations
 
-import asyncio
 import traceback
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select, update
@@ -54,13 +53,15 @@ class PostgresOutboxRepository(IOutboxRepository):
             .where(OutboxEvent.id == event_id)
             .values(
                 status=OutboxStatus.PROCESSED,
-                processed_at=datetime.now(timezone.utc),
+                processed_at=datetime.now(UTC),
             )
         )
         await self.session.execute(stmt)
         await self.session.commit()
 
-    async def record_failure(self, event_id: uuid.UUID, error_trace: str, max_retries: int = 3) -> None:
+    async def record_failure(
+        self, event_id: uuid.UUID, error_trace: str, max_retries: int = 3
+    ) -> None:
         stmt = select(OutboxEvent).where(OutboxEvent.id == event_id)
         res = await self.session.execute(stmt)
         event = res.scalar_one_or_none()
@@ -86,7 +87,7 @@ class PostgresOutboxRepository(IOutboxRepository):
             )
         else:
             event.status = OutboxStatus.FAILED
-            logger.warn(
+            logger.warning(
                 "outbox.retry_scheduled",
                 event_id=str(event.id),
                 event_type=event.event_type,
@@ -137,6 +138,7 @@ class OutboxRelay:
 
     async def publish_event(self, event: OutboxEvent) -> None:
         import valkey.asyncio as valkey
+
         v_client = valkey.Valkey(
             host=settings.VALKEY_HOST,
             port=settings.VALKEY_PORT,
@@ -160,7 +162,7 @@ class OutboxRelay:
                 await self.publish_event(event)
                 await self.repo.mark_processed(event.id)
                 processed += 1
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 tb = traceback.format_exc()
                 logger.error("outbox.publish_failed", event_id=str(event.id), error=str(exc))
                 await self.repo.record_failure(event.id, error_trace=tb)

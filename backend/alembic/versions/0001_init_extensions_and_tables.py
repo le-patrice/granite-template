@@ -68,10 +68,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_platform_users_email", table_name="platform_users")
     op.drop_table("platform_users")
-
-    op.execute('DROP EXTENSION IF EXISTS "vector";')
-    op.execute('DROP EXTENSION IF EXISTS "btree_gin";')
-    op.execute('DROP EXTENSION IF EXISTS "pg_trgm";')
-    op.execute('DROP EXTENSION IF EXISTS "uuid-ossp";')

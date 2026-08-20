@@ -4,6 +4,7 @@ Telemetry validation schemas (zero-copy msgspec).
 TelemetryRecord  – single sensor reading from one transformer.
 TelemetryBatch   – envelope wrapping a list of records for bulk ingestion.
 """
+
 import msgspec
 
 
@@ -20,6 +21,7 @@ class TelemetryRecord(msgspec.Struct, frozen=True, gc=False):
     frequency_hz    : Grid frequency in Hertz (nominally 50 or 60)
     timestamp_epoch : Unix epoch seconds (UTC) of the measurement
     """
+
     transformer_id: str
     voltage_v: float
     current_a: float
@@ -30,4 +32,5 @@ class TelemetryRecord(msgspec.Struct, frozen=True, gc=False):
 
 class TelemetryBatch(msgspec.Struct, frozen=True, gc=False):
     """Envelope for bulk ingestion — wraps multiple records in one HTTP body."""
+
     records: list[TelemetryRecord]

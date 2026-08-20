@@ -1,6 +1,7 @@
 """
 OpenAPI 3.1 configuration with OAuth2 Password flow and Bearer JWT security schemes.
 """
+
 from __future__ import annotations
 
 from litestar.openapi.config import OpenAPIConfig

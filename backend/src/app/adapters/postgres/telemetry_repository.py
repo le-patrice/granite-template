@@ -5,8 +5,9 @@ Uses a single parameterised INSERT ... VALUES (...), (...), ...
 statement instead of per-row ORM calls.  At 1 000 records/batch this
 reduces DB round-trips by ~1 000×.
 """
+
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +32,7 @@ class PostgresTelemetryRepository(ITelemetryRepository):
         if not records:
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Build a list of dicts matching the column names
         rows = [
@@ -43,9 +44,7 @@ class PostgresTelemetryRepository(ITelemetryRepository):
                 "power_factor": r.power_factor,
                 "frequency_hz": r.frequency_hz,
                 # Convert Unix epoch float → UTC datetime
-                "recorded_at": datetime.fromtimestamp(
-                    r.timestamp_epoch, tz=timezone.utc
-                ),
+                "recorded_at": datetime.fromtimestamp(r.timestamp_epoch, tz=UTC),
                 "ingested_at": now,
             }
             for r in records

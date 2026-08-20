@@ -6,6 +6,9 @@ POST /api/v1/telemetry/ingest
     validation), bulk-inserts to PostgreSQL, and fans out the latest
     reading per unique transformer to Valkey for hot-path cache.
 """
+
+from typing import Any, ClassVar
+
 from litestar import Controller, post
 from litestar.di import Provide
 from litestar.status_codes import HTTP_202_ACCEPTED
@@ -17,10 +20,10 @@ from app.domain.telemetry.contracts import ITelemetryRepository
 from app.domain.telemetry.schemas import TelemetryRecord
 from app.presentation.guards.auth_guard import JWTAuthGuard
 
-
 # ---------------------------------------------------------------------------
 # DI provider
 # ---------------------------------------------------------------------------
+
 
 async def provide_telemetry_repo(db_session: AsyncSession) -> ITelemetryRepository:
     return PostgresTelemetryRepository(session=db_session)
@@ -30,10 +33,11 @@ async def provide_telemetry_repo(db_session: AsyncSession) -> ITelemetryReposito
 # Controller
 # ---------------------------------------------------------------------------
 
+
 class TelemetryController(Controller):
     path = "/telemetry"
-    guards = [JWTAuthGuard()]
-    dependencies = {"telemetry_repo": Provide(provide_telemetry_repo)}
+    guards: ClassVar[list[Any]] = [JWTAuthGuard()]
+    dependencies: ClassVar[dict[str, Provide]] = {"telemetry_repo": Provide(provide_telemetry_repo)}
 
     @post(
         path="/ingest",
@@ -64,11 +68,9 @@ class TelemetryController(Controller):
 
         # Fan out concurrently – asyncio.gather avoids sequential awaits
         import asyncio
+
         await asyncio.gather(
-            *(
-                valkey_service.set_transformer_state(tid, rec)
-                for tid, rec in latest.items()
-            )
+            *(valkey_service.set_transformer_state(tid, rec) for tid, rec in latest.items())
         )
 
         return {

@@ -1,5 +1,5 @@
-from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class AppSettings(BaseSettings):
     # ── Runtime ───────────────────────────────────────────────────────────────
@@ -21,15 +21,15 @@ class AppSettings(BaseSettings):
     # ── Token TTLs ────────────────────────────────────────────────────────────
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     RESET_TOKEN_EXPIRE_MINUTES: int = 60
-    VERIFY_TOKEN_EXPIRE_MINUTES: int = 1440   # 24 h
+    VERIFY_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 h
 
     # ── SMTP / Mail ───────────────────────────────────────────────────────────
     # All SMTP fields are Optional so the mailer degrades gracefully to
     # structlog mock mode when not configured.
-    SMTP_HOST: Optional[str] = None
+    SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
     SMTP_TLS: bool = True
     EMAILS_FROM_ADDRESS: str = "noreply@platform.internal"
     EMAILS_FROM_NAME: str = "Enterprise Platform"
@@ -40,7 +40,7 @@ class AppSettings(BaseSettings):
     FIRST_SUPERUSER_NAME: str = "Platform Administrator"
 
     # ── Observability & Crash Reporting ───────────────────────────────────────
-    SENTRY_DSN: Optional[str] = None
+    SENTRY_DSN: str | None = None
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

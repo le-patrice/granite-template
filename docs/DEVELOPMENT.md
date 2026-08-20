@@ -12,12 +12,32 @@ Ensure the following tools are installed on your workstation:
 - **Container Engine:** **Podman 4.5+ or 5.x** (configured for rootless operation) or Docker 24+.
 - **Compose Provider:** `podman-compose` or `docker-compose-plugin`.
 - **Build & Task Automation:** GNU `make` 4.x.
+- **Scaffolding Tool:** `copier` (`pipx install copier` or `uv tool install copier`).
 - **Python Tooling:** Python 3.11+ and `uv` (optional for local editor LSP indexers).
 - **Frontend Tooling:** Node.js 22+ and `npm` 10+.
 
 ---
 
-## 2. Fast Local Bootstrapping
+## 2. Generating a New Project from GitHub (Copier)
+
+To instantiate a fresh, standalone production repository directly from the Git repository:
+
+```bash
+# 1. Run Copier interactive scaffolding against GitHub
+copier copy gh:le-patrice/granite-stack my-new-service
+
+# 2. Enter newly generated project directory
+cd my-new-service
+
+# 3. Boot container mesh & apply migrations
+make up
+make migrate
+make seed
+```
+
+---
+
+## 3. Fast Local Bootstrapping (Existing Repository)
 
 ```bash
 # 1. Clone your project repository

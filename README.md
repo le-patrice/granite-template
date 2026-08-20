@@ -44,7 +44,49 @@
 
 ---
 
-## ⚡ 3-Minute Quickstart (Rootless Podman Default)
+## 🚀 Quickstart: Generate a New Service in 60 Seconds
+
+Bootstrap a production-ready application directly from this GitHub template repository:
+
+### 1. Prerequisites
+Ensure you have [Copier](https://copier.readthedocs.io/), [Podman](https://podman.io/) (or Docker), and `make` installed:
+```bash
+pipx install copier   # or: uv tool install copier
+```
+
+### 2. Generate Your Project
+Run Copier directly against the Git repository URL:
+```bash
+copier copy gh:le-patrice/granite-stack my-new-service
+```
+Follow the interactive CLI prompts to select your project name, target ports, and optional infrastructure layers (TimescaleDB, pgvector, Valkey, PgBouncer, Cloudflare Tunnels, Frontend).
+
+### 3. Start the Stack (Podman Default)
+Navigate into your generated project and launch the container mesh:
+```bash
+cd my-new-service
+
+# 1. Boot all core mesh services in background
+make up
+
+# 2. Apply database migrations & seed initial superuser
+make migrate
+make seed
+
+# 3. Run zero-pollution transactional tests
+make test
+```
+
+### 4. Access Points
+- **Interactive Swagger UI:** [http://localhost:8000/docs/swagger](http://localhost:8000/docs/swagger)
+- **Scalar API Docs:** [http://localhost:8000/docs/scalar](http://localhost:8000/docs/scalar)
+- **Frontend Application:** [http://localhost:8000/](http://localhost:8000/)
+- **Traefik Gateway Dashboard:** [http://localhost:8080/dashboard/](http://localhost:8080/dashboard/)
+- **Mailpit Email Inspection:** [http://localhost:8025](http://localhost:8025)
+
+---
+
+## ⚡ Direct Repository Quickstart (Rootless Podman Default)
 
 ### 1. Boot the Container Mesh
 ```bash

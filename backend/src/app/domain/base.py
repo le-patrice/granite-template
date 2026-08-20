@@ -13,23 +13,25 @@ Changes vs. original
   ``updated_at`` so TimescaleDB chunk compression doesn't trip on Python-side
   defaults.  ``onupdate`` is preserved for ORM-layer updates.
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.engine import Dialect
-from sqlalchemy.types import JSON, TypeDecorator, TypeEngine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import JSON, TypeDecorator, TypeEngine
 
-__all__ = ["Base", "AuditBase", "VectorColumn"]
+__all__ = ["AuditBase", "Base", "VectorColumn"]
 
 
 # ---------------------------------------------------------------------------
 # Declarative base
 # ---------------------------------------------------------------------------
+
 
 class Base(DeclarativeBase):
     pass
@@ -38,6 +40,7 @@ class Base(DeclarativeBase):
 # ---------------------------------------------------------------------------
 # Audit mixin
 # ---------------------------------------------------------------------------
+
 
 class AuditBase(Base):
     """
@@ -48,6 +51,7 @@ class AuditBase(Base):
     (``server_default``), giving correctness whether the ORM or raw SQL
     performs the insert.
     """
+
     __abstract__ = True
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -56,15 +60,15 @@ class AuditBase(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         server_default=func.now(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         server_default=func.now(),
-        onupdate=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
 
@@ -72,6 +76,7 @@ class AuditBase(Base):
 # ---------------------------------------------------------------------------
 # Dialect-aware vector column
 # ---------------------------------------------------------------------------
+
 
 class VectorColumn(TypeDecorator[list[float]]):
     """
@@ -124,15 +129,14 @@ class VectorColumn(TypeDecorator[list[float]]):
         if dialect.name in {"postgresql", "cockroachdb"}:
             try:
                 from pgvector.sqlalchemy import Vector as PgVector  # type: ignore[import]
+
                 return dialect.type_descriptor(PgVector(self.dim))
             except ImportError:
                 # pgvector not installed — fall through to JSON
                 pass
         return dialect.type_descriptor(JSON())
 
-    def process_result_value(
-        self, value: Any, dialect: Dialect
-    ) -> Optional[list[float]]:
+    def process_result_value(self, value: Any, dialect: Dialect) -> list[float] | None:
         if value is None:
             return None
         if hasattr(value, "tolist"):

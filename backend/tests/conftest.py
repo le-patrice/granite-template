@@ -19,6 +19,7 @@ Requires in pyproject.toml [dev]:
     pytest-asyncio>=0.23
     httpx>=0.27
 """
+
 import asyncio
 import uuid
 from collections.abc import AsyncGenerator
@@ -30,7 +31,6 @@ import pytest_asyncio
 from httpx import AsyncClient
 from litestar.testing import AsyncTestClient
 from sqlalchemy.ext.asyncio import (
-    AsyncConnection,
     AsyncSession,
     AsyncTransaction,
     create_async_engine,
@@ -45,6 +45,7 @@ from app.core.settings import settings
 # or the loop_scope kwarg shown here.
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Session-scoped event loop so all async fixtures share the same loop."""
@@ -56,6 +57,7 @@ def event_loop():
 # ---------------------------------------------------------------------------
 # Database engine — created once per session, never pooled in tests.
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture(scope="session")
 async def async_engine():
@@ -78,19 +80,36 @@ async def async_engine():
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def ensure_db_schema(async_engine):
     """Ensure all SQLAlchemy declarative tables exist in database before running tests."""
-    from app.domain.base import Base
+    from sqlalchemy import text
+
+    import app.domain.events.models
+    import app.domain.telemetry.models
     import app.domain.users.models  # noqa: F401
-    import app.domain.telemetry.models  # noqa: F401
-    import app.domain.events.models  # noqa: F401
+    from app.domain.base import Base
 
     async with async_engine.begin() as conn:
+        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'))
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        except Exception:  # noqa: S110, BLE001
+            pass
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.execute(
+                text(
+                    "TRUNCATE platform_users, telemetry_readings, outbox_events, dead_letter_events CASCADE;"
+                )
+            )
+        except Exception:  # noqa: S110, BLE001
+            pass
     yield
 
 
 # ---------------------------------------------------------------------------
 # Transactional rollback session — one per test function.
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture()
 async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
@@ -112,20 +131,23 @@ async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     async with async_engine.connect() as conn:
         outer_tx: AsyncTransaction = await conn.begin()
 
-        session = AsyncSession(bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint")
+        session = AsyncSession(
+            bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
 
         await session.begin_nested()  # SAVEPOINT
 
         yield session
 
-        await session.rollback()      # roll back to savepoint
-        await outer_tx.rollback()     # roll back outer transaction
+        await session.rollback()  # roll back to savepoint
+        await outer_tx.rollback()  # roll back outer transaction
         await session.close()
 
 
 # ---------------------------------------------------------------------------
 # Valkey mock — prevents real network calls to Valkey during unit tests.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def mock_valkey():
@@ -151,6 +173,7 @@ def mock_valkey():
 # Litestar AsyncTestClient — boots the full ASGI app with lifespan.
 # ---------------------------------------------------------------------------
 
+
 @pytest_asyncio.fixture()
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """
@@ -167,6 +190,7 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
 # ---------------------------------------------------------------------------
 # Convenience: register a fresh user and return (email, password, token).
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture()
 async def registered_user(async_client: AsyncClient) -> dict[str, Any]:

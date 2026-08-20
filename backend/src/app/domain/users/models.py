@@ -9,6 +9,7 @@ Note: the ``pg_trgm`` extension must exist before migration runs.
 Migration 0001 already provisions it via
     op.execute('CREATE EXTENSION IF NOT EXISTS "pg_trgm";')
 """
+
 from sqlalchemy import Boolean, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,7 +22,7 @@ class User(AuditBase):
     email: Mapped[str] = mapped_column(
         String(255),
         unique=True,
-        index=True,       # standard B-Tree index for equality / join lookups
+        index=True,  # standard B-Tree index for equality / join lookups
         nullable=False,
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)

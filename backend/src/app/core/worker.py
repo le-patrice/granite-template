@@ -12,13 +12,14 @@ Features
 3.  Cron schedules for automatic background grooming & aggregation.
 4.  CLI runner compatible with `python -m saq app.core.worker.worker_settings --workers 4`.
 """
+
 from __future__ import annotations
 
 import asyncio
 from typing import Any
 
 import structlog
-from saq import CronJob, Job, Queue
+from saq import CronJob, Queue
 from saq.types import Context
 
 from app.core.settings import settings
@@ -38,6 +39,7 @@ queue = Queue.from_url(VALKEY_URL, name="default")
 # Background Task Definitions
 # ---------------------------------------------------------------------------
 
+
 async def send_transactional_email(
     ctx: Context,
     recipient: str,
@@ -56,7 +58,6 @@ async def send_transactional_email(
     )
     # Mailer integration or SMTP call
     try:
-        from app.core.mail import send_templated_email
         # If template is given, dispatch via template engine; otherwise log/mock
         await asyncio.sleep(0.1)
         logger.info("task.email.sent", recipient=recipient, subject=subject)
@@ -136,7 +137,9 @@ cron_jobs = [
     # Run session pruning every hour at minute 0
     CronJob(function=prune_expired_sessions, cron="0 * * * *"),
     # Run telemetry rollup every 15 minutes
-    CronJob(function=process_telemetry_aggregation, cron="*/15 * * * *", kwargs={"time_window": "15m"}),
+    CronJob(
+        function=process_telemetry_aggregation, cron="*/15 * * * *", kwargs={"time_window": "15m"}
+    ),
 ]
 
 # ---------------------------------------------------------------------------

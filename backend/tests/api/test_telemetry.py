@@ -13,6 +13,7 @@ POST /api/v1/telemetry/ingest
     • Malformed payload (missing field) — 400 / 422
     • Valkey failure does not break ingestion (resilience)
 """
+
 import time
 from unittest.mock import AsyncMock, patch
 
@@ -56,10 +57,7 @@ def _record(
 
 
 class TestTelemetryIngest:
-
-    async def test_single_record(
-        self, registered_user: dict, async_client: AsyncClient
-    ):
+    async def test_single_record(self, registered_user: dict, async_client: AsyncClient):
         resp = await async_client.post(
             _INGEST_URL,
             json=[_record()],
@@ -85,9 +83,7 @@ class TestTelemetryIngest:
         # All records share the same transformer_id → only 1 Valkey update
         assert body["transformers_updated"] == 1
 
-    async def test_multi_transformer_batch(
-        self, registered_user: dict, async_client: AsyncClient
-    ):
+    async def test_multi_transformer_batch(self, registered_user: dict, async_client: AsyncClient):
         records = [
             _record(transformer_id=f"TRF-{i:03d}", timestamp_epoch=time.time() + i)
             for i in range(5)
@@ -102,9 +98,7 @@ class TestTelemetryIngest:
         assert body["accepted"] == 5
         assert body["transformers_updated"] == 5
 
-    async def test_empty_batch(
-        self, registered_user: dict, async_client: AsyncClient
-    ):
+    async def test_empty_batch(self, registered_user: dict, async_client: AsyncClient):
         resp = await async_client.post(
             _INGEST_URL,
             json=[],
@@ -122,7 +116,6 @@ class TestTelemetryIngest:
 
 
 class TestTelemetryOrdering:
-
     async def test_only_newest_record_cached(
         self, registered_user: dict, async_client: AsyncClient
     ):
@@ -134,7 +127,7 @@ class TestTelemetryOrdering:
         old_record = _record(transformer_id="TRF-042", timestamp_epoch=now - 60)
         new_record = _record(
             transformer_id="TRF-042",
-            voltage_v=12_000.0,           # distinctive value
+            voltage_v=12_000.0,  # distinctive value
             timestamp_epoch=now,
         )
 
@@ -153,14 +146,14 @@ class TestTelemetryOrdering:
 
             assert mock_set.call_count == 1
             _, cached_record = mock_set.call_args[0]
-            voltage = cached_record.voltage_v if hasattr(cached_record, "voltage_v") else cached_record["voltage_v"]
-            assert voltage == 12_000.0, (
-                "Valkey should receive the newest record, not the older one"
+            voltage = (
+                cached_record.voltage_v
+                if hasattr(cached_record, "voltage_v")
+                else cached_record["voltage_v"]
             )
+            assert voltage == 12_000.0, "Valkey should receive the newest record, not the older one"
 
-    async def test_reverse_arrival_order(
-        self, registered_user: dict, async_client: AsyncClient
-    ):
+    async def test_reverse_arrival_order(self, registered_user: dict, async_client: AsyncClient):
         """Sending newest-first then oldest must still cache only the newest."""
         now = time.time()
         new_record = _record(
@@ -187,7 +180,11 @@ class TestTelemetryOrdering:
 
             assert mock_set.call_count == 1
             _, cached_record = mock_set.call_args[0]
-            voltage = cached_record.voltage_v if hasattr(cached_record, "voltage_v") else cached_record["voltage_v"]
+            voltage = (
+                cached_record.voltage_v
+                if hasattr(cached_record, "voltage_v")
+                else cached_record["voltage_v"]
+            )
             assert voltage == 9_999.0
 
 
@@ -197,7 +194,6 @@ class TestTelemetryOrdering:
 
 
 class TestTelemetryAuth:
-
     async def test_ingest_without_token(self, async_client: AsyncClient):
         resp = await async_client.post(_INGEST_URL, json=[_record()])
         assert resp.status_code == 401
@@ -214,7 +210,7 @@ class TestTelemetryAuth:
         resp = await async_client.post(
             _INGEST_URL,
             json=[_record()],
-            headers={"Authorization": "Token abc123"},   # wrong scheme
+            headers={"Authorization": "Token abc123"},  # wrong scheme
         )
         assert resp.status_code == 401
 
@@ -225,10 +221,7 @@ class TestTelemetryAuth:
 
 
 class TestTelemetryValidation:
-
-    async def test_missing_required_field(
-        self, registered_user: dict, async_client: AsyncClient
-    ):
+    async def test_missing_required_field(self, registered_user: dict, async_client: AsyncClient):
         # omit voltage_v
         bad_record = {
             "transformer_id": "TRF-BAD",
@@ -256,9 +249,7 @@ class TestTelemetryValidation:
         )
         assert resp.status_code in (400, 422)
 
-    async def test_not_a_list(
-        self, registered_user: dict, async_client: AsyncClient
-    ):
+    async def test_not_a_list(self, registered_user: dict, async_client: AsyncClient):
         # Sending a single object instead of a list
         resp = await async_client.post(
             _INGEST_URL,
@@ -274,7 +265,6 @@ class TestTelemetryValidation:
 
 
 class TestTelemetryResilience:
-
     async def test_valkey_error_does_not_block_persistence(
         self, registered_user: dict, async_client: AsyncClient
     ):

@@ -23,10 +23,11 @@ PATCH /api/v1/users/me
     • Update password and re-login — new token works
     • No token — returns 401
 """
-import pytest
-import pytest_asyncio
-from httpx import AsyncClient
 
+import uuid
+
+import pytest
+from httpx import AsyncClient
 
 pytestmark = pytest.mark.asyncio
 
@@ -36,8 +37,8 @@ pytestmark = pytest.mark.asyncio
 # ─────────────────────────────────────────────────────────────────────────────
 
 _REGISTER_URL = "/api/v1/users/register"
-_LOGIN_URL    = "/api/v1/auth/login"
-_ME_URL       = "/api/v1/users/me"
+_LOGIN_URL = "/api/v1/auth/login"
+_ME_URL = "/api/v1/users/me"
 
 _BASE_USER = {
     "email": "alice@example.com",
@@ -59,15 +60,20 @@ async def _login(client: AsyncClient, email: str, password: str) -> str:
 # Registration
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestRegistration:
 
+class TestRegistration:
     async def test_register_happy_path(self, async_client: AsyncClient):
-        resp = await async_client.post(_REGISTER_URL, json=_BASE_USER)
+        user_payload = {
+            "email": f"alice.{uuid.uuid4().hex[:6]}@example.com",
+            "password": "AliceSecure!2026",
+            "full_name": "Alice Example",
+        }
+        resp = await async_client.post(_REGISTER_URL, json=user_payload)
 
         assert resp.status_code == 201, resp.text
         body = resp.json()
-        assert body["email"] == _BASE_USER["email"]
-        assert body["full_name"] == _BASE_USER["full_name"]
+        assert body["email"] == user_payload["email"]
+        assert body["full_name"] == user_payload["full_name"]
         assert body["is_active"] is True
         assert body["is_superuser"] is False
         # hashed_password must NOT be exposed
@@ -77,8 +83,13 @@ class TestRegistration:
         assert "id" in body and len(body["id"]) == 36
 
     async def test_register_duplicate_email(self, async_client: AsyncClient):
-        await async_client.post(_REGISTER_URL, json=_BASE_USER)
-        resp = await async_client.post(_REGISTER_URL, json=_BASE_USER)
+        user_payload = {
+            "email": f"dup.{uuid.uuid4().hex[:6]}@example.com",
+            "password": "AliceSecure!2026",
+            "full_name": "Alice Example",
+        }
+        await async_client.post(_REGISTER_URL, json=user_payload)
+        resp = await async_client.post(_REGISTER_URL, json=user_payload)
         assert resp.status_code == 409
 
     async def test_register_missing_email(self, async_client: AsyncClient):
@@ -96,8 +107,8 @@ class TestRegistration:
 # Login
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestLogin:
 
+class TestLogin:
     async def test_login_valid_credentials(self, async_client: AsyncClient):
         # Register first so the user exists
         await async_client.post(_REGISTER_URL, json=_BASE_USER)
@@ -132,8 +143,8 @@ class TestLogin:
 # /me – profile retrieval
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGetMe:
 
+class TestGetMe:
     async def test_get_me_authenticated(self, registered_user, async_client: AsyncClient):
         resp = await async_client.get(
             _ME_URL,
@@ -169,8 +180,8 @@ class TestGetMe:
 # /me – profile update
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestUpdateMe:
 
+class TestUpdateMe:
     async def test_update_full_name(self, registered_user, async_client: AsyncClient):
         resp = await async_client.patch(
             _ME_URL,
@@ -180,9 +191,7 @@ class TestUpdateMe:
         assert resp.status_code == 200, resp.text
         assert resp.json()["full_name"] == "Alice Updated"
 
-    async def test_update_password_and_relogin(
-        self, registered_user, async_client: AsyncClient
-    ):
+    async def test_update_password_and_relogin(self, registered_user, async_client: AsyncClient):
         new_password = "NewAlicePass!2026"
 
         # Change password
@@ -212,9 +221,7 @@ class TestUpdateMe:
         resp = await async_client.patch(_ME_URL, json={"full_name": "Hacker"})
         assert resp.status_code == 401
 
-    async def test_update_me_partial_only_name(
-        self, registered_user, async_client: AsyncClient
-    ):
+    async def test_update_me_partial_only_name(self, registered_user, async_client: AsyncClient):
         """PATCH with only full_name must not wipe out the password field."""
         resp = await async_client.patch(
             _ME_URL,

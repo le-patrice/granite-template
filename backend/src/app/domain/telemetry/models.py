@@ -10,8 +10,9 @@ common query patterns:
   • "latest N readings for transformer X"
   • "all readings for transformer X in time-window [t0, t1]"
 """
+
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Float, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -47,13 +48,11 @@ class TelemetryReading(Base):
     # Row insertion time – useful for lag monitoring
     ingested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
     )
 
     # Composite index: covers queries like
     #   WHERE transformer_id = :id AND recorded_at BETWEEN :t0 AND :t1
     # TimescaleDB will further prune partitions on `recorded_at`.
-    __table_args__ = (
-        Index("ix_telemetry_transformer_recorded", "transformer_id", "recorded_at"),
-    )
+    __table_args__ = (Index("ix_telemetry_transformer_recorded", "transformer_id", "recorded_at"),)

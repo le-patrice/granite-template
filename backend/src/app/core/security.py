@@ -33,13 +33,13 @@ Features
 Reference: references/litestar-fullstack/src/py/app/lib/crypt.py
            references/fastapi-template/backend/app/core/security.py
 """
+
 from __future__ import annotations
 
 import asyncio
 import hmac
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from pwdlib import PasswordHash
@@ -48,15 +48,15 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 from app.core.settings import settings
 
 __all__ = [
-    "verify_password",
-    "get_password_hash",
     "create_access_token",
     "create_signed_token",
     "decode_access_token",
     "decode_scoped_token",
-    "revoke_token",
+    "get_password_hash",
     "is_token_revoked",
     "require_superuser",
+    "revoke_token",
+    "verify_password",
 ]
 
 # ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ def verify_password(plain: str, hashed: str) -> bool:
     """
     try:
         ok = _hasher.verify(plain, hashed)
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Corrupted hash or wrong algorithm — treat as failed verification
         ok = False
     # Dummy comparison of equal-length byte strings to prevent timing analysis
@@ -112,12 +112,13 @@ async def get_password_hash_async(password: str) -> str:
 # JWT helpers
 # ---------------------------------------------------------------------------
 
+
 def _build_payload(
     subject: str,
-    expires_delta: Optional[timedelta],
-    extra: Optional[dict],
+    expires_delta: timedelta | None,
+    extra: dict | None,
 ) -> dict:
-    expire = datetime.now(timezone.utc) + (
+    expire = datetime.now(UTC) + (
         expires_delta
         if expires_delta is not None
         else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -125,8 +126,8 @@ def _build_payload(
     payload: dict = {
         "sub": str(subject),
         "exp": expire,
-        "iat": datetime.now(timezone.utc),
-        "jti": str(uuid.uuid4()),   # JWT ID — used for revocation
+        "iat": datetime.now(UTC),
+        "jti": str(uuid.uuid4()),  # JWT ID — used for revocation
     }
     if extra:
         payload.update(extra)
@@ -135,9 +136,9 @@ def _build_payload(
 
 def create_access_token(
     subject: str,
-    expires_delta: Optional[timedelta] = None,
+    expires_delta: timedelta | None = None,
     is_superuser: bool = False,
-    extra: Optional[dict] = None,
+    extra: dict | None = None,
 ) -> str:
     """
     Issue a bearer access token for *subject* (user UUID string).
@@ -159,7 +160,7 @@ def create_access_token(
 def create_signed_token(
     subject: str,
     scope: str,
-    expires_delta: Optional[timedelta] = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
     """
     Issue a scoped signed token for non-auth flows (password reset, email
@@ -197,8 +198,7 @@ def decode_scoped_token(token: str, expected_scope: str) -> dict:
     payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
     if payload.get("scope") != expected_scope:
         raise ValueError(
-            f"Token scope mismatch: expected '{expected_scope}', "
-            f"got '{payload.get('scope')}'"
+            f"Token scope mismatch: expected '{expected_scope}', got '{payload.get('scope')}'"
         )
     return payload
 
@@ -206,6 +206,7 @@ def decode_scoped_token(token: str, expected_scope: str) -> dict:
 # ---------------------------------------------------------------------------
 # Token revocation  (Valkey-backed blocklist)
 # ---------------------------------------------------------------------------
+
 
 async def revoke_token(jti: str, expires_in: int) -> None:
     """
@@ -238,6 +239,7 @@ async def is_token_revoked(jti: str) -> bool:
 # Role enforcement
 # ---------------------------------------------------------------------------
 
+
 def require_superuser(is_superuser: bool) -> None:
     """
     Assert that the current user has superuser privileges.
@@ -254,6 +256,5 @@ def require_superuser(is_superuser: bool) -> None:
     """
     if not is_superuser:
         from litestar.exceptions import PermissionDeniedException
-        raise PermissionDeniedException(
-            "This action requires superuser privileges."
-        )
+
+        raise PermissionDeniedException("This action requires superuser privileges.")

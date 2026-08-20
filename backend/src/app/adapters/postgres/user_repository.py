@@ -1,6 +1,8 @@
 import uuid
+
 from advanced_alchemy.repository import SQLAlchemyAsyncRepository
 from sqlalchemy import select
+
 from app.domain.users.contracts import IUserRepository
 from app.domain.users.models import User
 

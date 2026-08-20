@@ -3,6 +3,7 @@ Telemetry domain repository contract.
 
 Keeps the domain layer independent of any persistence technology.
 """
+
 from abc import ABC, abstractmethod
 
 from app.domain.telemetry.schemas import TelemetryRecord

@@ -1,11 +1,11 @@
 """
 msgspec struct schemas for Outbox and Dead Letter Queue events.
 """
+
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 import msgspec
 
@@ -22,7 +22,7 @@ class OutboxEventRead(msgspec.Struct, kw_only=True):
     status: str
     retry_count: int
     created_at: datetime
-    processed_at: Optional[datetime] = None
+    processed_at: datetime | None = None
 
 
 class DeadLetterEventRead(msgspec.Struct, kw_only=True):

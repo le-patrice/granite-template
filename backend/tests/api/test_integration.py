@@ -21,11 +21,11 @@ Edge cases:
   - Accessing protected route with tampered token
   - Registering duplicate email (idempotency guard)
 """
+
 from __future__ import annotations
 
-import time
+import asyncio
 import uuid
-from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -35,16 +35,17 @@ pytestmark = pytest.mark.asyncio
 # ---------------------------------------------------------------------------
 # Endpoint constants
 # ---------------------------------------------------------------------------
-_HEALTH_URL   = "/health"
+_HEALTH_URL = "/health"
 _REGISTER_URL = "/api/v1/users/register"
-_LOGIN_URL    = "/api/v1/auth/login"
-_LOGOUT_URL   = "/api/v1/auth/logout"
-_ME_URL       = "/api/v1/users/me"
+_LOGIN_URL = "/api/v1/auth/login"
+_LOGOUT_URL = "/api/v1/auth/logout"
+_ME_URL = "/api/v1/users/me"
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
@@ -77,8 +78,8 @@ async def _register_and_login(client: AsyncClient) -> tuple[dict, str]:
 # Health probe
 # ---------------------------------------------------------------------------
 
-class TestHealthEndpoint:
 
+class TestHealthEndpoint:
     async def test_health_returns_ok(self, async_client: AsyncClient):
         resp = await async_client.get(_HEALTH_URL)
         assert resp.status_code == 200
@@ -98,8 +99,8 @@ class TestHealthEndpoint:
 # Registration
 # ---------------------------------------------------------------------------
 
-class TestRegistrationIntegration:
 
+class TestRegistrationIntegration:
     async def test_register_success(self, async_client: AsyncClient):
         payload = _unique_user()
         resp = await async_client.post(_REGISTER_URL, json=payload)
@@ -121,9 +122,7 @@ class TestRegistrationIntegration:
         r2 = await async_client.post(_REGISTER_URL, json=payload)
         assert r2.status_code == 409
 
-    async def test_register_invalid_payload_returns_400_or_422(
-        self, async_client: AsyncClient
-    ):
+    async def test_register_invalid_payload_returns_400_or_422(self, async_client: AsyncClient):
         resp = await async_client.post(_REGISTER_URL, json={"email": "only@email.com"})
         assert resp.status_code in (400, 422)
 
@@ -132,8 +131,8 @@ class TestRegistrationIntegration:
 # Login
 # ---------------------------------------------------------------------------
 
-class TestLoginIntegration:
 
+class TestLoginIntegration:
     async def test_login_returns_bearer_token(self, async_client: AsyncClient):
         payload = _unique_user()
         await async_client.post(_REGISTER_URL, json=payload)
@@ -182,8 +181,8 @@ class TestLoginIntegration:
 # Authenticated profile (GET /me)
 # ---------------------------------------------------------------------------
 
-class TestProfileIntegration:
 
+class TestProfileIntegration:
     async def test_get_me_returns_own_profile(self, async_client: AsyncClient):
         payload = _unique_user()
         await async_client.post(_REGISTER_URL, json=payload)
@@ -205,12 +204,8 @@ class TestProfileIntegration:
         resp = await async_client.get(_ME_URL, headers=_bearer("not.a.jwt"))
         assert resp.status_code == 401
 
-    async def test_get_me_missing_bearer_prefix_returns_401(
-        self, async_client: AsyncClient
-    ):
-        resp = await async_client.get(
-            _ME_URL, headers={"Authorization": "Token abc123"}
-        )
+    async def test_get_me_missing_bearer_prefix_returns_401(self, async_client: AsyncClient):
+        resp = await async_client.get(_ME_URL, headers={"Authorization": "Token abc123"})
         assert resp.status_code == 401
 
 
@@ -218,8 +213,8 @@ class TestProfileIntegration:
 # Logout + token revocation
 # ---------------------------------------------------------------------------
 
-class TestLogoutIntegration:
 
+class TestLogoutIntegration:
     async def test_logout_returns_200(self, async_client: AsyncClient):
         _, token = await _register_and_login(async_client)
         resp = await async_client.post(_LOGOUT_URL, headers=_bearer(token))
@@ -255,7 +250,7 @@ class TestLogoutIntegration:
         second_login = await async_client.post(_LOGIN_URL, json=creds)
         assert second_login.status_code == 201
         token2 = second_login.json()["access_token"]
-        assert token2 != token1   # new jti
+        assert token2 != token1  # new jti
 
         me = await async_client.get(_ME_URL, headers=_bearer(token2))
         assert me.status_code == 200
@@ -269,8 +264,8 @@ class TestLogoutIntegration:
 # Token refresh (simulate: re-login after expiry)
 # ---------------------------------------------------------------------------
 
-class TestTokenRefreshIntegration:
 
+class TestTokenRefreshIntegration:
     async def test_second_login_issues_fresh_token(self, async_client: AsyncClient):
         """
         We don't have a /refresh endpoint yet; re-login is the refresh flow.
@@ -282,7 +277,7 @@ class TestTokenRefreshIntegration:
         creds = {"email": payload["email"], "password": payload["password"]}
         r1 = await async_client.post(_LOGIN_URL, json=creds)
         # Small sleep ensures different iat timestamp if tokens are time-based
-        time.sleep(0.05)
+        await asyncio.sleep(0.05)
         r2 = await async_client.post(_LOGIN_URL, json=creds)
 
         t1, t2 = r1.json()["access_token"], r2.json()["access_token"]

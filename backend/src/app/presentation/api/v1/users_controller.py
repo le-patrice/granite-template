@@ -18,10 +18,11 @@ Superadmin Management (SuperuserGuard Required):
   • PATCH  /api/v1/users/{user_id}/role – Assign/modify user privileges & roles
   • DELETE /api/v1/users/{user_id}      – Delete user account
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from typing import ClassVar
 
 from litestar import Controller, delete, get, patch, post
 from litestar.connection import Request
@@ -43,10 +44,10 @@ from app.domain.users.schemas import (
 )
 from app.presentation.guards.auth_guard import JWTAuthGuard, SuperuserGuard
 
-
 # ---------------------------------------------------------------------------
 # Dependency provider (shared with AuthController)
 # ---------------------------------------------------------------------------
+
 
 async def provide_user_repo(db_session: AsyncSession) -> IUserRepository:
     return PostgresUserRepository(session=db_session)
@@ -55,6 +56,7 @@ async def provide_user_repo(db_session: AsyncSession) -> IUserRepository:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _model_to_read(user: User) -> UserRead:
     """Convert a User ORM model to the UserRead response schema."""
@@ -71,9 +73,10 @@ def _model_to_read(user: User) -> UserRead:
 # Controller
 # ---------------------------------------------------------------------------
 
+
 class UsersController(Controller):
     path = "/users"
-    dependencies = {"user_repo": Provide(provide_user_repo)}
+    dependencies: ClassVar[dict[str, Provide]] = {"user_repo": Provide(provide_user_repo)}
 
     # ------------------------------------------------------------------
     # POST /register  — open, no auth required

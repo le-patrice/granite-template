@@ -6,6 +6,7 @@ States:
   • OPEN: Threshold exceeded. Requests immediately fail with CircuitOpenException.
   • HALF_OPEN: Cooldown elapsed. A limited number of trial requests are permitted.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +14,7 @@ import enum
 import time
 from collections.abc import Callable, Coroutine
 from functools import wraps
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 import structlog
 
@@ -126,7 +127,7 @@ class CircuitBreaker:
 
     async def _on_failure(self, exc: Exception) -> None:
         self._failure_count += 1
-        logger.warn(
+        logger.warning(
             "circuit_breaker.failure",
             name=self.name,
             state=self._state.value,
@@ -145,7 +146,9 @@ class CircuitBreaker:
             self._state = CircuitState.OPEN
             self._last_state_change = time.monotonic()
 
-    def __call__(self, fn: Callable[..., Coroutine[Any, Any, T]]) -> Callable[..., Coroutine[Any, Any, T]]:
+    def __call__(
+        self, fn: Callable[..., Coroutine[Any, Any, T]]
+    ) -> Callable[..., Coroutine[Any, Any, T]]:
         @wraps(fn)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
             return await self.call(fn, *args, **kwargs)

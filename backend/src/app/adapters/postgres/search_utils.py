@@ -10,9 +10,11 @@ where:
     • k is the smoothing constant (default: 60)
     • r_m(d) is the rank of document d in modality m (text vs vector)
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +30,7 @@ async def hybrid_search_rrf(
     select_columns: list[str],
     rrf_k: int = 60,
     limit: int = 20,
-    where_clause: Optional[str] = None,
+    where_clause: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Executes a Hybrid RRF query combining pg_trgm and pgvector.

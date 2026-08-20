@@ -7,9 +7,10 @@ Routes:
   • GET /health/startup – Startup probe: validates database migration baseline.
   • GET /health         – General health status.
 """
+
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from litestar import Controller, get
 from litestar.exceptions import HTTPException
@@ -22,7 +23,7 @@ from app.core.settings import settings
 
 class HealthController(Controller):
     path = "/health"
-    opt = {"exclude_from_auth": True}
+    opt: ClassVar[dict[str, bool]] = {"exclude_from_auth": True}
 
     @get(
         path=["", "/"],
@@ -60,13 +61,14 @@ class HealthController(Controller):
             else:
                 results["database"] = "unhealthy"
                 all_ready = False
-        except Exception as exc:
-            results["database"] = f"error: {str(exc)}"
+        except Exception as exc:  # noqa: BLE001
+            results["database"] = f"error: {exc!s}"
             all_ready = False
 
         # 2. Valkey check
         try:
             import valkey.asyncio as valkey
+
             v_client = valkey.Valkey(
                 host=settings.VALKEY_HOST,
                 port=settings.VALKEY_PORT,
@@ -79,9 +81,9 @@ class HealthController(Controller):
             else:
                 results["valkey"] = "unhealthy"
                 all_ready = False
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # Valkey might be optional in certain test environments
-            results["valkey"] = f"error: {str(exc)}"
+            results["valkey"] = f"error: {exc!s}"
             # Don't fail readiness completely if valkey is mock-only in dev, but flag it
             if settings.ENVIRONMENT == "production":
                 all_ready = False
@@ -109,7 +111,7 @@ class HealthController(Controller):
                 "status": "started",
                 "schema_version": version or "initial",
             }
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=HTTP_503_SERVICE_UNAVAILABLE,
                 detail={"status": "startup_failed", "error": str(exc)},

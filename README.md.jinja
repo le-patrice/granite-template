@@ -1,0 +1,97 @@
+# {{ project_name }}
+
+> Production-grade, resilient enterprise platform generated via **LiteForge / Granite Stack**.
+
+---
+
+## ⚡ Quickstart
+
+### 1. Boot Container Mesh
+```bash
+# Start all core services in background (App, DB, Cache, Ingress)
+make up
+```
+
+### 2. Database Migrations & Initial Setup
+```bash
+# Apply pending Alembic migrations
+make migrate
+
+# Provision initial superuser from .env settings
+make seed
+```
+
+### 3. Run Automated Tests
+```bash
+# Execute hermetic, zero-pollution transactional test suite
+make test
+```
+
+### 4. Interactive Endpoints
+- **Swagger UI:** [http://localhost:{{ app_port }}/docs/swagger](http://localhost:{{ app_port }}/docs/swagger)
+- **Scalar UI:** [http://localhost:{{ app_port }}/docs/scalar](http://localhost:{{ app_port }}/docs/scalar)
+- **OpenAPI Schema:** [http://localhost:{{ app_port }}/docs/openapi.json](http://localhost:{{ app_port }}/docs/openapi.json)
+- **Health Readiness:** [http://localhost:{{ app_port }}/health/ready](http://localhost:{{ app_port }}/health/ready)
+- **Prometheus Metrics:** [http://localhost:{{ app_port }}/metrics](http://localhost:{{ app_port }}/metrics)
+
+---
+
+## 🛠️ Common Workflows
+
+### Creating Database Migrations
+```bash
+# 1. Generate an autodetected migration revision
+make migration-create MSG="add_feature_table"
+
+# 2. Apply migration into containerized database
+make migrate
+```
+
+{% if include_frontend %}
+### Syncing TypeScript Frontend SDK
+```bash
+# Export OpenAPI 3.1 schema & generate typed TypeScript client bindings
+make frontend-sync
+```
+{% endif %}
+
+### Database Backups & Disaster Recovery
+```bash
+# Dump timestamped compressed PostgreSQL backup in backups/
+make db-backup
+
+# Verify backup archives
+make db-backup-verify
+```
+
+{% if include_distributed_worker %}
+### Distributed Background Worker
+```bash
+# Ensure background worker is active
+make worker
+
+# Tail live worker logs
+make worker-logs
+```
+{% endif %}
+
+{% if include_cloudflare_tunnel %}
+### Cloudflare Zero Trust Tunnel
+```bash
+# Check Cloudflare tunnel status
+make tunnel-status
+
+# Tail live tunnel logs
+make tunnel-logs
+```
+{% endif %}
+
+---
+
+## 📚 Documentation
+- **[Architecture](docs/ARCHITECTURE.md)**: Container topology, clean architecture boundaries, and database design.
+- **[Development](docs/DEVELOPMENT.md)**: Adding new domain features, testing runbook, and conventions.
+- **[Security & RBAC](docs/SECURITY_AND_RBAC.md)**: Argon2 hashing, JWT flows, and Superadmin RBAC guards.
+- **[Workers & Resilience](docs/WORKERS_AND_RESILIENCE.md)**: Asynchronous task queue, Outbox pattern, and circuit breakers.
+- **[Deployment](docs/DEPLOYMENT.md)**: Production Quadlets, Traefik edge routing, and PgBouncer pooling.
+- **[Operational Runbook](docs/RUNBOOK.md)**: Disaster recovery and troubleshooting recipes.
