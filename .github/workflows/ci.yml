@@ -1,103 +1,102 @@
-name: CI
+name: CI & Quality Gate
 
-# Triggers
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".gitignore"
+      - "LICENSE"
+      - "copier.yml"
   pull_request:
-    branches: [main, develop]
-  workflow_dispatch:      # manual trigger from GitHub UI
+    branches: [main, master]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".gitignore"
+      - "LICENSE"
+  schedule:
+    # Run once a week on Sunday at 03:00 UTC (preserves minutes quota)
+    - cron: "0 3 * * 0"
+  workflow_dispatch: # Allows manual one-click runs from GitHub UI
 
-# Cancel in-flight runs of the same workflow on the same branch
+# Cancel redundant in-flight runs on new commits
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Shared environment (override per-job as needed)
+# Shared environment (overridden per-job as needed)
 # ─────────────────────────────────────────────────────────────────────────────
 env:
   PYTHON_VERSION: "3.11"
-  NODE_VERSION:   "22"
-  POSTGRES_USER:     app_user
+  NODE_VERSION: "22"
+  POSTGRES_USER: app_user
   POSTGRES_PASSWORD: ci_password
-  POSTGRES_DB:       app_db
+  POSTGRES_DB: app_db
   DATABASE_URL: >-
     postgresql+asyncpg://app_user:ci_password@localhost:5432/app_db
   VALKEY_HOST: localhost
   VALKEY_PORT: "6379"
   SECRET_KEY: "ci_secret_key_not_for_production_use_at_all"
   ENVIRONMENT: "test"
+  FIRST_SUPERUSER_EMAIL: ci@platform.internal
+  FIRST_SUPERUSER_PASSWORD: CiSuperPass!2026
+  FIRST_SUPERUSER_NAME: "CI Admin"
 
 jobs:
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 1: Python linting (ruff check + ruff format)
+  # JOB 1: Lint & Style Gate — Python (Ruff)
   # ═══════════════════════════════════════════════════════════════════════════
-  lint-python:
-    name: "Lint — Python (ruff)"
-    runs-on: ubuntu-24.04
+  lint-and-format:
+    name: "Lint & Style Gate (Ruff)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/pyproject.toml"
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
 
-      - name: Install ruff
-        run: pip install "ruff>=0.5.0"
-
-      - name: ruff check (lint rules)
+      - name: Install dependencies
         working-directory: backend
-        run: ruff check src tests --output-format=github
+        run: uv sync --all-extras --dev
 
-      - name: ruff format (style check — no writes)
+      - name: Run Ruff lint
         working-directory: backend
-        run: ruff format src tests --check
+        run: uv run ruff check src tests --output-format=github
+
+      - name: Run Ruff format check
+        working-directory: backend
+        run: uv run ruff format --check src tests
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 2: TypeScript type check (tsc --noEmit)
+  # JOB 2: Integration Tests & Migrations (against real Postgres + Valkey)
   # ═══════════════════════════════════════════════════════════════════════════
-  lint-typescript:
-    name: "Lint — TypeScript (tsc)"
-    runs-on: ubuntu-24.04
+  integration-tests:
+    name: "Integration Tests & Migrations"
+    needs: lint-and-format
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: TypeScript type check
-        working-directory: frontend
-        run: npx tsc --noEmit
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 3: Backend test suite (pytest with ephemeral Postgres + Valkey)
-  # ═══════════════════════════════════════════════════════════════════════════
-  test-backend:
-    name: "Test — Backend (pytest)"
-    runs-on: ubuntu-24.04
-    needs: [lint-python]   # only run if lint passes
-
-    # ── Service containers ───────────────────────────────────────────────────
     services:
       postgres:
-        image: timescale/timescaledb-ha:pg16
+        image: docker.io/timescale/timescaledb-ha:pg16
         env:
-          POSTGRES_USER:     ${{ env.POSTGRES_USER }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB:       ${{ env.POSTGRES_DB }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
@@ -108,7 +107,7 @@ jobs:
           --health-start-period 30s
 
       valkey:
-        image: valkey/valkey:8-alpine
+        image: docker.io/valkey/valkey:8-alpine
         ports:
           - 6379:6379
         options: >-
@@ -118,23 +117,25 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/pyproject.toml"
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
 
-      - name: Install backend (with dev extras)
+      - name: Install backend dependencies (with dev extras)
         working-directory: backend
-        run: |
-          pip install -e ".[dev]"
-          # Install psycopg2 for Alembic sync engine (sync tests / migrations)
-          pip install psycopg2-binary
+        run: uv sync --all-extras --dev
 
-      - name: Wait for Postgres extensions
-        # TimescaleDB takes a few extra seconds to initialise extensions
+      - name: Wait for TimescaleDB to initialise extensions
         run: sleep 5
 
       - name: Apply database migrations
@@ -142,28 +143,24 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
-          # Swap asyncpg → psycopg2 for sync Alembic runner
           ALEMBIC_URL="${DATABASE_URL/postgresql+asyncpg/postgresql+psycopg2}"
-          alembic -c alembic.ini \
-            -x "sqlalchemy.url=${ALEMBIC_URL}" \
-            upgrade head
+          uv run alembic -c alembic.ini upgrade head
 
-      - name: Run pytest (fast suite — skip migration-cycle tests)
+      - name: Execute Pytest suite (fast + slow)
         working-directory: backend
         env:
-          DATABASE_URL:      ${{ env.DATABASE_URL }}
-          VALKEY_HOST:       ${{ env.VALKEY_HOST }}
-          VALKEY_PORT:       ${{ env.VALKEY_PORT }}
-          SECRET_KEY:        ${{ env.SECRET_KEY }}
-          ENVIRONMENT:       ${{ env.ENVIRONMENT }}
-          FIRST_SUPERUSER_EMAIL:    ci@platform.internal
-          FIRST_SUPERUSER_PASSWORD: CiSuperPass!2026
-          FIRST_SUPERUSER_NAME:     "CI Admin"
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          VALKEY_HOST: ${{ env.VALKEY_HOST }}
+          VALKEY_PORT: ${{ env.VALKEY_PORT }}
+          SECRET_KEY: ${{ env.SECRET_KEY }}
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          FIRST_SUPERUSER_EMAIL: ${{ env.FIRST_SUPERUSER_EMAIL }}
+          FIRST_SUPERUSER_PASSWORD: ${{ env.FIRST_SUPERUSER_PASSWORD }}
+          FIRST_SUPERUSER_NAME: ${{ env.FIRST_SUPERUSER_NAME }}
         run: |
-          pytest -m "not slow" \
+          uv run pytest -v \
             --tb=short \
-            --junitxml=reports/junit.xml \
-            -v
+            --junitxml=reports/junit.xml
 
       - name: Upload test report
         if: always()
@@ -173,20 +170,52 @@ jobs:
           path: backend/reports/junit.xml
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 4: OpenAPI schema export + frontend client generation drift check
+  # JOB 3: Frontend Build & TypeScript typecheck
+  # ═══════════════════════════════════════════════════════════════════════════
+  frontend-quality:
+    name: "Frontend Build & Typecheck"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: TypeScript typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build --if-present
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB 4: OpenAPI Schema Drift Check
   # ═══════════════════════════════════════════════════════════════════════════
   schema-drift:
-    name: "Schema — drift check (openapi-ts)"
-    runs-on: ubuntu-24.04
-    needs: [test-backend]
+    name: "Schema Drift Check (openapi-ts)"
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     services:
       postgres:
-        image: timescale/timescaledb-ha:pg16-latest
+        image: docker.io/timescale/timescaledb-ha:pg16
         env:
-          POSTGRES_USER:     ${{ env.POSTGRES_USER }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB:       ${{ env.POSTGRES_DB }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
@@ -197,65 +226,78 @@ jobs:
           --health-start-period 30s
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/pyproject.toml"
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
 
-      - name: Set up Node ${{ env.NODE_VERSION }}
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
 
-      - name: Install backend
+      - name: Install backend dependencies
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: uv sync --all-extras --dev
 
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
+      - name: Apply migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: |
+          ALEMBIC_URL="${DATABASE_URL/postgresql+asyncpg/postgresql+psycopg2}"
+          uv run alembic -c alembic.ini upgrade head
+
       - name: Export OpenAPI schema
         working-directory: backend
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          SECRET_KEY:   ${{ env.SECRET_KEY }}
-          ENVIRONMENT:  ${{ env.ENVIRONMENT }}
+          SECRET_KEY: ${{ env.SECRET_KEY }}
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
         run: python scripts/export_schemas.py
 
       - name: Generate TypeScript client from schema
         working-directory: frontend
         run: npm run generate-client
 
-      - name: Assert no uncommitted git diff (schema drift = fail)
+      - name: Assert no schema drift (uncommitted diff = fail)
         run: |
           git diff --exit-code -- frontend/src/client/ || {
             echo ""
             echo "❌ OpenAPI schema drift detected!"
             echo "   The generated TypeScript client is out of sync with the backend."
-            echo "   Run 'make export-schema && cd frontend && npm run generate-client'"
-            echo "   then commit the updated client files."
+            echo "   Run 'make frontend-sync' then commit the updated client files."
             exit 1
           }
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # JOB 5: Container build verification (multi-stage Containerfile)
+  # JOB 5: Container Image Build Verification
   # ═══════════════════════════════════════════════════════════════════════════
   container-build:
-    name: "Build — Container image"
-    runs-on: ubuntu-24.04
-    needs: [lint-python]   # build as soon as lint passes, parallel with tests
+    name: "Build — Container Image"
+    needs: lint-and-format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      # Build using docker (GitHub Actions standard; Podman also available but
-      # requires additional setup).  The image is identical on both engines.
       - name: Build backend container image
         run: |
           docker build \
@@ -265,7 +307,7 @@ jobs:
             --label "git.branch=${{ github.ref_name }}" \
             backend/
 
-      - name: Verify container starts and responds to /health
+      - name: Smoke-test container starts
         run: |
           docker run --rm -d \
             --name ci_app_test \
@@ -276,9 +318,7 @@ jobs:
             --env VALKEY_PORT=6379 \
             -p 8001:8000 \
             api-backend:ci-${{ github.sha }} || true
-          # Give container 5 s to start (it will fail DB connect but /health is DB-free)
           sleep 5
-          # A connection refused or 5xx here means the image is broken
           curl --fail --retry 3 --retry-delay 2 http://localhost:8001/health \
-            || echo "⚠ Health check skipped (expected — no DB in this job)"
+            || echo "⚠ Health check skipped — no DB in this job (expected)"
           docker stop ci_app_test 2>/dev/null || true

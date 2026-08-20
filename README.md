@@ -153,3 +153,20 @@ make frontend-sync    # Export OpenAPI schema & compile TypeScript fetch client
 | **[Production Deployment](docs/DEPLOYMENT.md)** | Systemd Quadlets, Cloudflare Tunnels, PgBouncer pooling, Traefik edge |
 | **[Operational Runbook](docs/RUNBOOK.md)** | Disaster recovery, backups, troubleshooting namespace locks & pool exhaustion |
 | **[Architecture Decisions (ADRs)](docs/decisions/)** | Michael Nygard ADR records (0001 through 0006) |
+
+---
+
+## 🧩 Architecture & Extensibility
+
+| Resource | Description |
+| :--- | :--- |
+| **[Domain Blueprint](docs/DOMAIN_BLUEPRINT.md)** | **Canonical developer reference for scaffolding new domains, porting sub-projects, configuring ORM models, background tasks, and integrating React/Vite and Astro frontends with end-to-end type safety.** |
+
+The Domain Blueprint covers:
+
+- 📁 Canonical directory structure for any new feature domain (`orders`, `invoicing`, `nlp_pipelines`, `device_telemetry`)
+- 🔩 Layer-by-layer implementation with complete production-ready code (schemas → interfaces → models → repository → controller)
+- ⚡ Async execution matrix: when to use `BackgroundTask` vs SAQ Worker vs Transactional Outbox
+- 🗄️ Alembic migration workflow with TimescaleDB hypertable and pgvector examples
+- 🌐 Full-stack frontend integration: React/Vite and Astro with `@hey-api/openapi-ts` end-to-end type safety
+- 🔄 Step-by-step checklist for porting standalone sub-projects (ML classifiers, FinTech services, etc.)
