@@ -133,7 +133,7 @@ Requires=platform-network-network.service
 
 [Container]
 Image=registry.example.com/granite/backend:latest
-ContainerName=api_app
+ContainerName=backend
 EnvironmentFile=/etc/platform/app.env
 Network=platform-network.network
 ExposeHostPort=8000:8000

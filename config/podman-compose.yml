@@ -104,7 +104,7 @@ services:
     build:
       context: ../backend
       dockerfile: ../config/Containerfile
-    container_name: api_app
+    container_name: backend
     restart: unless-stopped
     # No host-port binding — all traffic comes through Traefik
     expose:

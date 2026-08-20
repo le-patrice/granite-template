@@ -33,7 +33,7 @@
 | Service | Container Name | Internal Port | Host Port | Routing / Access Point |
 | :--- | :--- | :--- | :--- | :--- |
 | **Traefik Edge Router** | `traefik` | `80`, `8080` | `8000:80`, `8080:8080` | `http://localhost:8000` (Gateway), `http://localhost:8080` (Dashboard) |
-| **Litestar API Engine** | `api_app` | `8000` | Internal | Proxied via Traefik at `/api/v1/*`, `/docs/*`, `/health/*`, `/metrics` |
+| **Litestar API Engine** | `backend` | `8000` | Internal | Proxied via Traefik at `/api/v1/*`, `/docs/*`, `/health/*`, `/metrics` |
 | **Frontend UI (Dev)** | `frontend_dev` | `5173` | Internal | Proxied via Traefik at `/*` (Vite HMR Dev-Server) |
 | **SAQ Background Worker**| `worker_app` | None | None | Internal event queue consumer via Valkey |
 | **PgBouncer Pooler** | `pgbouncer_pool`| `6432` | `6432` | `localhost:6432` (High-concurrency transaction pool) |

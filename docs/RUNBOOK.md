@@ -46,7 +46,7 @@ make db-restore FILE=backups/db_backup_20260820_143000.sql.gz DB=app_db CONFIRM_
 podman unshare -- killall -9 slirp4netns pasta 2>/dev/null || true
 
 # 2. Force remove stuck container instances
-podman rm -f postgres_db api_app worker_app valkey_cache traefik 2>/dev/null || true
+podman rm -f postgres_db backend worker_app valkey_cache traefik 2>/dev/null || true
 
 # 3. Clean teardown and restart
 make down
@@ -100,10 +100,10 @@ make outbox-status
 **Remediation:**
 ```bash
 # 1. Inspect migration history inside the container
-podman exec -u 10001 -it api_app alembic history --verbose
+podman exec -u 10001 -it backend alembic history --verbose
 
 # 2. Merge divergent heads into a single revision
-podman exec -u 10001 -it api_app alembic merge heads -m "merge_divergent_heads"
+podman exec -u 10001 -it backend alembic merge heads -m "merge_divergent_heads"
 
 # 3. Apply the merged revision
 make migrate

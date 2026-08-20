@@ -27,7 +27,7 @@ export CONTAINER_HOST ?= unix:///run/user/$(shell id -u)/podman/podman.sock
 
 # Execution wrappers
 COMPOSE_BASE := $(CONTAINER_ENGINE) compose $(COMPOSE_FILE)
-EXEC_APP     := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i api_app
+EXEC_APP     := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i backend
 EXEC_DB      := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i postgres_db
 
 # Command argument overrides
