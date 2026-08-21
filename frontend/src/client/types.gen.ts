@@ -77,13 +77,13 @@ export type MetricsMetricsEndpointResponse = (string);
 
 export type MetricsMetricsEndpointError = unknown;
 
-export type ApiV1AuthTokenLoginResponse = (TokenResponse);
-
-export type ApiV1AuthTokenLoginError = unknown;
-
 export type ApiV1AuthLoginLoginResponse = (TokenResponse);
 
 export type ApiV1AuthLoginLoginError = unknown;
+
+export type ApiV1AuthTokenLoginResponse = (TokenResponse);
+
+export type ApiV1AuthTokenLoginError = unknown;
 
 export type ApiV1AuthLogoutLogoutResponse = ({
     [key: string]: unknown;

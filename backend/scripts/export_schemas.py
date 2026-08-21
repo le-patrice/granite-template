@@ -17,20 +17,29 @@ from app.main import app
 def export_schema() -> None:
     schema = app.openapi_schema.to_schema()
     
-    # Target frontend/openapi.json
-    output_path = BACKEND_DIR.parent / "frontend" / "openapi.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Candidate target locations for maximum flexibility across host and containers
+    candidates = [
+        BACKEND_DIR.parent / "frontend" / "openapi.json",
+        Path.cwd() / "frontend" / "openapi.json",
+        Path.cwd() / "openapi.json",
+        BACKEND_DIR / "openapi.json",
+    ]
     
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(schema, f, indent=2)
-    
-    # Also write to dist/openapi.json for compatibility
-    dist_path = BACKEND_DIR.parent / "dist" / "openapi.json"
-    dist_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(dist_path, "w", encoding="utf-8") as f:
-        json.dump(schema, f, indent=2)
-    
-    print(f"✅ Successfully exported OpenAPI schema to: {output_path}")
+    exported = False
+    for target in candidates:
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with open(target, "w", encoding="utf-8") as f:
+                json.dump(schema, f, indent=2)
+            print(f"✅ Successfully exported OpenAPI schema to: {target}")
+            exported = True
+            break
+        except (PermissionError, OSError):
+            continue
+            
+    if not exported:
+        # Fallback to standard output if all filesystem locations are non-writable
+        print(json.dumps(schema, indent=2))
 
 if __name__ == "__main__":
     export_schema()

@@ -130,6 +130,8 @@ services:
       - ../backend/src:/app/src:z        # live-reload via Granian --reload
       - ../backend/tests:/app/tests:z
       - ../backend/scripts:/app/scripts:z
+      - ../backend/alembic:/app/alembic:z
+      - ../backend/alembic.ini:/app/alembic.ini:z
       - ../backend/pyproject.toml:/app/pyproject.toml:z
       - ../logs:/app/logs:z
     healthcheck:

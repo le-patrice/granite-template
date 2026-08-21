@@ -6,10 +6,10 @@ Guards
 1. JWTAuthGuard / jwt_auth_guard
    • Validates Authorization: Bearer <token>
    • Checks Valkey revocation blocklist
-   • Populates connection.scope with user_id, is_superuser, token_jti
+   • Populates connection.scope with user_id, tenant_id, role, is_superuser, token_jti
 
-2. superuser_guard / SuperuserGuard
-   • Validates superadmin privileges (is_superuser=True)
+2. SuperuserGuard / SuperAdminGuard / superuser_guard
+   • Validates superadmin privileges (is_superuser=True or role='superadmin')
    • Raises 401 if unauthenticated, 403 Forbidden if not superuser
 """
 
@@ -51,6 +51,8 @@ class JWTAuthGuard:
         user_id: str | None = payload.get("sub")
         jti: str | None = payload.get("jti")
         is_super: bool = bool(payload.get("is_superuser", False))
+        tenant_id: str | None = payload.get("tenant_id") or payload.get("organization_id")
+        role: str = payload.get("role") or ("superadmin" if is_super else "user")
 
         if not user_id:
             raise NotAuthorizedException("Token is missing 'sub' claim.")
@@ -63,6 +65,8 @@ class JWTAuthGuard:
         connection.scope["user_id"] = user_id
         connection.scope["token_jti"] = jti or ""
         connection.scope["is_superuser"] = is_super
+        connection.scope["tenant_id"] = tenant_id or ""
+        connection.scope["role"] = role
 
 
 jwt_auth_guard = JWTAuthGuard()
@@ -70,12 +74,14 @@ jwt_auth_guard = JWTAuthGuard()
 
 def superuser_guard(connection: ASGIConnection, _: RouteHandlerType) -> None:
     """
-    Asserts that the current authenticated user has is_superuser=True.
+    Asserts that the current authenticated user has is_superuser=True or role='superadmin'.
     """
     user_id = connection.scope.get("user_id")
     if not user_id:
         raise NotAuthorizedException("Authentication required.")
-    if not connection.scope.get("is_superuser", False):
+    is_super = connection.scope.get("is_superuser", False)
+    role = connection.scope.get("role", "")
+    if not (is_super or role == "superadmin"):
         raise PermissionDeniedException("Superadmin privileges required to perform this action.")
 
 
@@ -94,3 +100,15 @@ class SuperuserGuard:
     ) -> None:
         await self._auth(connection, handler)
         superuser_guard(connection, handler)
+
+
+# Standardized SuperAdminGuard alias
+SuperAdminGuard = SuperuserGuard
+
+__all__ = [
+    "JWTAuthGuard",
+    "SuperAdminGuard",
+    "SuperuserGuard",
+    "jwt_auth_guard",
+    "superuser_guard",
+]

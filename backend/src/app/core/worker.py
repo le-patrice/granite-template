@@ -132,6 +132,21 @@ async def process_batch_export(ctx: Context, **kwargs: Any) -> dict[str, Any]:
     return result
 
 
+async def poll_and_dispatch_outbox(ctx: Context, **kwargs: Any) -> int:
+    """
+    Polls unpublished outbox events from PostgreSQL and relays them to Valkey streams.
+    """
+    from app.adapters.outbox.relay import OutboxRelay, PostgresOutboxRepository
+    from app.core.database import db_config
+
+    async with db_config.get_session() as session:
+        repo = PostgresOutboxRepository(session=session)
+        relay = OutboxRelay(repo=repo)
+        processed = await relay.process_sweep(batch_size=50)
+        logger.info("task.outbox_sweep.completed", processed_count=processed)
+        return processed
+
+
 # ---------------------------------------------------------------------------
 # Cron Jobs Configuration
 # ---------------------------------------------------------------------------
@@ -143,6 +158,8 @@ cron_jobs = [
     CronJob(
         function=process_telemetry_aggregation, cron="*/15 * * * *", kwargs={"time_window": "15m"}
     ),
+    # Poll and dispatch pending transactional outbox events every minute
+    CronJob(function=poll_and_dispatch_outbox, cron="* * * * *"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -156,6 +173,7 @@ settings = {
         process_telemetry_aggregation,
         prune_expired_sessions,
         process_batch_export,
+        poll_and_dispatch_outbox,
     ],
     "cron_jobs": cron_jobs,
     "concurrency": 4,

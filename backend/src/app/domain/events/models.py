@@ -35,6 +35,18 @@ class OutboxEvent(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+    aggregate_type: Mapped[str] = mapped_column(
+        String(128),
+        default="general",
+        server_default="general",
+        nullable=False,
+        index=True,
+    )
+    aggregate_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
     event_type: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     payload_json: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[OutboxStatus] = mapped_column(

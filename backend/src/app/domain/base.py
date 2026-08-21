@@ -1,17 +1,13 @@
 """
 Domain base classes with production-grade ORM features.
 
-Changes vs. original
----------------------
-• ``VectorColumn`` helper — a dialect-aware TypeDecorator adapted directly from
-  ``references/advanced-alchemy/advanced_alchemy/types/vector.py`` so models can
-  add ML embedding columns without importing advanced-alchemy types at runtime.
-  Falls back to JSON on non-PostgreSQL dialects; uses ``pgvector.sqlalchemy.Vector``
-  when the library is installed.
-
-• ``AuditBase`` now uses ``server_default=func.now()`` for ``created_at`` /
-  ``updated_at`` so TimescaleDB chunk compression doesn't trip on Python-side
-  defaults.  ``onupdate`` is preserved for ORM-layer updates.
+Features
+--------
+• ``AuditBase``: Abstract base entity with UUID PK and UTC audit timestamps.
+• ``TenantBase``: Abstract base entity inheriting from ``AuditBase`` with
+  tenant isolation (``organization_id``) and Optimistic Concurrency Control
+  (``version_id`` + ``version_id_col`` mapping).
+• ``VectorColumn``: Dialect-aware TypeDecorator adapted for pgvector embeddings.
 """
 
 from __future__ import annotations
@@ -20,12 +16,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, Integer, func
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import JSON, TypeDecorator, TypeEngine
 
-__all__ = ["AuditBase", "Base", "VectorColumn"]
+__all__ = ["AuditBase", "Base", "TenantBase", "VectorColumn"]
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +70,33 @@ class AuditBase(Base):
 
 
 # ---------------------------------------------------------------------------
+# Tenant & OCC Base Mixin
+# ---------------------------------------------------------------------------
+
+
+class TenantBase(AuditBase):
+    """
+    Tenant-scoped base entity with PostgreSQL Row-Level Security (RLS) support
+    and Optimistic Concurrency Control (OCC) version tracking.
+    """
+
+    __abstract__ = True
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        index=True,
+        nullable=False,
+    )
+    version_id: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        server_default="1",
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+
+# ---------------------------------------------------------------------------
 # Dialect-aware vector column
 # ---------------------------------------------------------------------------
 
@@ -86,32 +109,6 @@ class VectorColumn(TypeDecorator[list[float]]):
       1. PostgreSQL  → ``pgvector.sqlalchemy.Vector(dim)``  (if pgvector installed)
       2. PostgreSQL  → ``JSON``                              (fallback, no pgvector)
       3. All others  → ``JSON``                              (cross-dialect)
-
-    Adapted from:
-      references/advanced-alchemy/advanced_alchemy/types/vector.py
-
-    Usage in a model::
-
-        class MyModel(AuditBase):
-            embedding: Mapped[list[float]] = mapped_column(
-                VectorColumn(1536), nullable=True
-            )
-
-    Similarity search (requires pgvector)::
-
-        from sqlalchemy import select
-        results = await session.execute(
-            select(MyModel)
-            .order_by(MyModel.embedding.cosine_distance([0.1, 0.2, ...]))
-            .limit(10)
-        )
-
-    Notes
-    -----
-    •  ``cache_ok = True`` — the column is parameterised only by ``dim``,
-       which is hashable, so SQLAlchemy can cache compiled statements.
-    •  Import of ``pgvector`` is deferred to ``load_dialect_impl`` so the
-       package is optional — models compile even without it installed.
     """
 
     impl = JSON
