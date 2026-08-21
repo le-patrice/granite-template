@@ -103,7 +103,10 @@ worker-logs: ## Tail live logs from SAQ distributed background task worker
 down: ## Stop and remove stack containers (preserves database volumes)
 	@echo -e "$(YELLOW)Stopping stack containers...$(NC)"
 	@$(COMPOSE_BASE) stop -t 5 2>/dev/null || true
-	@$(COMPOSE_BASE) down
+	@$(COMPOSE_BASE) down 2>/dev/null || ( \
+		podman unshare -- killall -9 slirp4netns pasta 2>/dev/null || true; \
+		$(COMPOSE_BASE) down 2>/dev/null || true \
+	)
 	@echo -e "$(GREEN)✅ Containers stopped cleanly (Database volumes preserved)$(NC)"
 
 .PHONY: down-volumes
@@ -155,6 +158,13 @@ logs-db: ## Stream live logs from PostgreSQL / TimescaleDB
 .PHONY: logs-traefik
 logs-traefik: ## Stream live access logs from the Traefik edge proxy
 	@$(COMPOSE_BASE) logs -f --tail=100 traefik
+
+.PHONY: clean-logs
+clean-logs: ## Recreate containers to flush stale log output
+	@echo -e "$(YELLOW)Flushing container log buffers...$(NC)"
+	@$(MAKE) down
+	@$(MAKE) up
+	@echo -e "$(GREEN)✅ Clean stack running with empty log buffers$(NC)"
 
 .PHONY: ps
 ps: ## List status of all mesh containers

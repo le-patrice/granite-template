@@ -1,21 +1,20 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      '@': '/src',
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
+    host: "0.0.0.0",
     port: 5173,
-    proxy: {
-      '/api': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
-      '/metrics': 'http://localhost:8000',
+    strictPort: true,
+    watch: {
+      usePolling: true, // Ensures hot-module reload functions seamlessly inside Podman volumes
     },
-  },
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
   },
 });
