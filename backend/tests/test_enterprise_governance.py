@@ -11,7 +11,6 @@ Tests:
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import String, text
@@ -162,6 +161,7 @@ class TestOutboxWorkerLoop:
             return 1
 
         import valkey.asyncio as valkey
+
         monkeypatch.setattr(valkey.Valkey, "publish", mock_publish)
 
         # Enqueue event with aggregate metadata

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from sqlalchemy import DateTime, Integer, func
 from sqlalchemy.engine import Dialect
@@ -93,7 +93,7 @@ class TenantBase(AuditBase):
         nullable=False,
     )
 
-    __mapper_args__ = {"version_id_col": version_id}
+    __mapper_args__: ClassVar[dict[str, Any]] = {"version_id_col": version_id}
 
 
 # ---------------------------------------------------------------------------
