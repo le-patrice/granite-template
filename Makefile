@@ -128,15 +128,32 @@ restart: ## Restart services (e.g., make restart SERVICE=app)
 	@echo -e "$(GREEN)✅ Restart complete$(NC)"
 
 # ------------------------------------------------------------------------------
-# Inspection & Observability
+# Observability & Live Log Streaming
 # ------------------------------------------------------------------------------
+.PHONY: logs
+logs: ## Stream live logs from all stack containers in real time
+	@echo -e "$(YELLOW)Streaming live stack logs (Ctrl+C to exit)...$(NC)"
+	@$(COMPOSE_BASE) logs -f --tail=100
+
+.PHONY: logs-api
+logs-api: ## Stream live logs specifically from the Litestar backend API
+	@$(COMPOSE_BASE) logs -f --tail=100 app
+
+.PHONY: logs-worker
+logs-worker: ## Stream live logs from the SAQ background worker
+	@$(COMPOSE_BASE) logs -f --tail=100 worker
+
+.PHONY: logs-db
+logs-db: ## Stream live logs from PostgreSQL / TimescaleDB
+	@$(COMPOSE_BASE) logs -f --tail=100 postgres-db
+
+.PHONY: logs-traefik
+logs-traefik: ## Stream live access logs from the Traefik edge proxy
+	@$(COMPOSE_BASE) logs -f --tail=100 traefik
+
 .PHONY: ps
 ps: ## List status of all mesh containers
 	@$(COMPOSE_BASE) ps
-
-.PHONY: logs
-logs: ## Tail container logs (e.g., make logs SERVICE=app)
-	@$(COMPOSE_BASE) logs -f --tail=200 $(SERVICE)
 
 .PHONY: health
 health: ## Perform HTTP health check against local Litestar instance

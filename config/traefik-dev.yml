@@ -23,7 +23,8 @@ log:
   format: json           # json | common
 
 accessLog:
-  format: json
+  format: common
+  bufferingSize: 0 # Flushes log lines immediately without buffer delay
   fields:
     defaultMode: keep
     headers:

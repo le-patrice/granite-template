@@ -18,6 +18,7 @@
 
 networks:
   platform_net:
+    name: platform_net
     driver: bridge
 
 services:
@@ -110,6 +111,9 @@ services:
     expose:
       - "8000"
     environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONIOENCODING=utf-8
       - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
       - VALKEY_HOST=valkey-cache
       - VALKEY_PORT=6379
@@ -154,6 +158,9 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "saq", "app.core.worker.worker_settings", "--workers", "4"]
     environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONIOENCODING=utf-8
       - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
       - VALKEY_HOST=valkey-cache
       - VALKEY_PORT=6379
