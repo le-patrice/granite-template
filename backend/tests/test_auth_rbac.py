@@ -154,7 +154,8 @@ class TestSuperadminRBAC:
         # 2. Superadmin lists all users
         list_resp = await async_client.get("/api/v1/users", headers=admin_headers)
         assert list_resp.status_code == 200
-        assert any(u["id"] == target_user_id for u in list_resp.json())
+        user_list = list_resp.json().get("data", list_resp.json())
+        assert any(u["id"] == target_user_id for u in user_list)
 
         # 3. Superadmin promotes user to superuser
         patch_resp = await async_client.patch(

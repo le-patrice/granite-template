@@ -43,14 +43,15 @@ def upgrade() -> None:
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS audit_logs (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            table_name VARCHAR(128) NOT NULL,
-            operation VARCHAR(16) NOT NULL,
+            id UUID DEFAULT gen_random_uuid(),
+            table_name TEXT NOT NULL,
+            operation TEXT NOT NULL,
             record_id UUID NOT NULL,
             old_data JSONB,
             new_data JSONB,
-            changed_by VARCHAR(255),
-            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+            changed_by TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            PRIMARY KEY (id, created_at)
         );
 
         CREATE INDEX IF NOT EXISTS ix_audit_logs_table_created ON audit_logs (table_name, created_at);

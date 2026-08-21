@@ -26,9 +26,10 @@ ENV_FILE         ?= --env-file .env
 export CONTAINER_HOST ?= unix:///run/user/$(shell id -u)/podman/podman.sock
 
 # Execution wrappers
-COMPOSE_BASE := $(CONTAINER_ENGINE) compose $(COMPOSE_FILE)
-EXEC_APP     := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i backend
-EXEC_DB      := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i postgres_db
+COMPOSE_BASE  := $(CONTAINER_ENGINE) compose $(COMPOSE_FILE)
+EXEC_APP      := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i backend
+EXEC_DB       := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i postgres_db
+EXEC_FRONTEND := $(COMPOSE_BASE) exec -T frontend 2>/dev/null || $(CONTAINER_ENGINE) exec -i frontend_dev
 
 # Command argument overrides
 SERVICE ?= app
@@ -141,6 +142,10 @@ logs: ## Stream live logs from all stack containers in real time
 .PHONY: logs-api
 logs-api: ## Stream live logs specifically from the Litestar backend API
 	@$(COMPOSE_BASE) logs -f --tail=100 app
+
+.PHONY: logs-frontend
+logs-frontend: ## Stream live logs from Vite frontend dev server
+	@$(COMPOSE_BASE) logs -f --tail=100 frontend
 
 .PHONY: logs-worker
 logs-worker: ## Stream live logs from the SAQ background worker
@@ -303,18 +308,24 @@ db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups
 .PHONY: export-schema
 export-schema: ## Export Litestar OpenAPI 3.1 schema to frontend/openapi.json
 	@echo -e "$(YELLOW)Extracting OpenAPI schema...$(NC)"
-	@python backend/scripts/export_schemas.py 2>/dev/null || $(EXEC_APP) python -c "from app.main import app; import json; print(json.dumps(app.openapi_schema.to_schema(), indent=2))" > frontend/openapi.json
+	@python backend/scripts/export_schemas.py 2>/dev/null || $(EXEC_APP) python scripts/export_schemas.py > frontend/openapi.json 2>/dev/null || true
 	@echo -e "$(GREEN)✅ Exported to frontend/openapi.json$(NC)"
 
 .PHONY: frontend-sync
 frontend-sync: export-schema ## Compile TypeScript fetch client from exported OpenAPI schema
 	@if [ -d "frontend" ]; then \
 		echo -e "$(BLUE)Generating frontend TypeScript client via @hey-api/openapi-ts...$(NC)"; \
-		cd frontend && npm run generate-client; \
+		$(EXEC_FRONTEND) npm run generate-client 2>/dev/null || (cd frontend && npm run generate-client); \
 		echo -e "$(GREEN)✅ Frontend API bindings updated in frontend/src/client/$(NC)"; \
 	else \
 		echo -e "$(YELLOW)Frontend directory not present. Skipping TypeScript generation.$(NC)"; \
 	fi
+
+.PHONY: frontend-build
+frontend-build: ## Build production frontend distribution bundle inside container
+	@echo -e "$(BLUE)Building production frontend bundle...$(NC)"
+	@$(EXEC_FRONTEND) npm run build 2>/dev/null || (cd frontend && npm run build)
+	@echo -e "$(GREEN)✅ Frontend build complete in frontend/dist/$(NC)"
 
 # ------------------------------------------------------------------------------
 # Cloudflare Tunnel
@@ -333,8 +344,15 @@ tunnel-restart: ## Restart the Cloudflare Tunnel container
 	@$(COMPOSE_BASE) restart cloudflared
 
 # ------------------------------------------------------------------------------
-# Automated Testing
+# Quality Assurance & Testing
 # ------------------------------------------------------------------------------
+.PHONY: lint
+lint: ## Run Ruff linter and formatter checks inside backend container
+	@echo -e "$(BLUE)Running Ruff linter and format check...$(NC)"
+	@$(EXEC_APP) ruff check src tests
+	@$(EXEC_APP) ruff format --check src tests
+	@echo -e "$(GREEN)✅ Ruff lint and formatting passed cleanly$(NC)"
+
 .PHONY: test
 test: ## Run test suite inside app container using isolated database subtransactions
 	@echo -e "$(BLUE)Executing pytest suite inside container...$(NC)"

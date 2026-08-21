@@ -280,6 +280,17 @@ class MailService:
             )
         )
 
+    async def send_test_email(self, email_to: str) -> None:
+        """Dispatch a test email to verify SMTP configuration."""
+        await self._dispatch(
+            EmailMessage(
+                to_address=email_to,
+                subject=f"Test email from {settings.APP_NAME}",
+                html_body=f"<h1>Test Email</h1><p>This is a test email sent from {settings.APP_NAME} to verify your SMTP setup.</p>",
+                text_body=f"Test Email\n\nThis is a test email sent from {settings.APP_NAME} to verify your SMTP setup.",
+            )
+        )
+
 
 # ---------------------------------------------------------------------------
 # Token helpers (signed JWTs, validated by security.decode_access_token)
@@ -302,6 +313,11 @@ def generate_verify_token(user_email: str) -> str:
         scope="email_verify",
         expires_delta=timedelta(minutes=settings.VERIFY_TOKEN_EXPIRE_MINUTES),
     )
+
+
+async def send_test_email(email_to: str) -> None:
+    """Dispatch a test email using mail_service singleton."""
+    await mail_service.send_test_email(email_to=email_to)
 
 
 # Module-level singleton — import and use directly:

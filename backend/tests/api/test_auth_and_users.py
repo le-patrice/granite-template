@@ -29,6 +29,8 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
+from app.core.security import create_access_token
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -238,3 +240,88 @@ class TestUpdateMe:
             },
         )
         assert login.status_code == 201
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# /me/password & /me delete & /utils endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestUpdatePasswordMe:
+    async def test_update_password_success(self, registered_user, async_client: AsyncClient):
+        new_pwd = "UpdatedPassword123!"
+        resp = await async_client.patch(
+            "/api/v1/users/me/password",
+            json={
+                "current_password": registered_user["password"],
+                "new_password": new_pwd,
+            },
+            headers=_auth_headers(registered_user["token"]),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["message"] == "Password updated successfully"
+
+        # Re-login with new password
+        login = await async_client.post(
+            _LOGIN_URL,
+            json={"email": registered_user["email"], "password": new_pwd},
+        )
+        assert login.status_code == 201
+
+    async def test_update_password_wrong_current(self, registered_user, async_client: AsyncClient):
+        resp = await async_client.patch(
+            "/api/v1/users/me/password",
+            json={
+                "current_password": "WrongCurrentPassword123!",
+                "new_password": "NewValidPassword123!",
+            },
+            headers=_auth_headers(registered_user["token"]),
+        )
+        assert resp.status_code == 400
+
+    async def test_update_password_same_password(self, registered_user, async_client: AsyncClient):
+        resp = await async_client.patch(
+            "/api/v1/users/me/password",
+            json={
+                "current_password": registered_user["password"],
+                "new_password": registered_user["password"],
+            },
+            headers=_auth_headers(registered_user["token"]),
+        )
+        assert resp.status_code == 400
+
+
+class TestDeleteMe:
+    async def test_delete_standard_user_me(self, registered_user, async_client: AsyncClient):
+        resp = await async_client.delete(
+            _ME_URL,
+            headers=_auth_headers(registered_user["token"]),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["message"] == "User deleted successfully"
+
+        # Further login must fail
+        login = await async_client.post(
+            _LOGIN_URL,
+            json={"email": registered_user["email"], "password": registered_user["password"]},
+        )
+        assert login.status_code == 401
+
+
+class TestUtilsEndpoints:
+    async def test_health_check_endpoint(self, async_client: AsyncClient):
+        resp = await async_client.get("/api/v1/utils/health-check/")
+        assert resp.status_code == 200
+        assert resp.json() is True
+
+    async def test_test_email_endpoint(self, async_client: AsyncClient):
+        admin_id = str(uuid.uuid4())
+        admin_token = create_access_token(subject=admin_id, is_superuser=True)
+        headers = _auth_headers(admin_token)
+        resp = await async_client.post(
+            "/api/v1/utils/test-email/",
+            params={"email_to": "tester@example.com"},
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["message"] == "Test email sent"

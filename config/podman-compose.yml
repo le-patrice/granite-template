@@ -184,18 +184,19 @@ services:
     networks:
       - platform_net
 
-  # ── Vite frontend dev-server (optional — comment out for API-only work) ───
+  # ── Vite frontend dev-server ───────────────────────────────────────────────
   frontend:
     image: docker.io/library/node:22-alpine
     container_name: frontend_dev
     working_dir: /app
     volumes:
       - ../frontend:/app:z
+      - frontend_node_modules:/app/node_modules
     ports:
       - "5173:5173"
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost/api/v1
+      - VITE_API_URL=
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     networks:
       - platform_net
@@ -243,3 +244,5 @@ volumes:
     name: config_postgres_data
   valkey_data:
     name: config_valkey_data
+  frontend_node_modules:
+    name: config_frontend_node_modules

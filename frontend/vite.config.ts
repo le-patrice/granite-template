@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   server: {
@@ -14,7 +14,29 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: {
-      usePolling: true, // Ensures hot-module reload functions seamlessly inside Podman volumes
+      usePolling: true,
+    },
+    proxy: {
+      "/api": {
+        target: process.env.VITE_BACKEND_URL || "http://app:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/health": {
+        target: process.env.VITE_BACKEND_URL || "http://app:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/docs": {
+        target: process.env.VITE_BACKEND_URL || "http://app:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/metrics": {
+        target: process.env.VITE_BACKEND_URL || "http://app:8000",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });

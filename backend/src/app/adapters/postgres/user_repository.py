@@ -1,7 +1,7 @@
 import uuid
 
 from advanced_alchemy.repository import SQLAlchemyAsyncRepository
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.domain.users.contracts import IUserRepository
 from app.domain.users.models import User
@@ -26,9 +26,14 @@ class PostgresUserRepository(SQLAlchemyAsyncRepository[User], IUserRepository):
         return await super().update(user, auto_commit=True)
 
     async def list_all(self, limit: int = 100, offset: int = 0) -> list[User]:
-        statement = select(User).offset(offset).limit(limit)
+        statement = select(User).order_by(User.created_at.desc()).offset(offset).limit(limit)
         result = await self.session.execute(statement)
         return list(result.scalars().all())
+
+    async def count_all(self) -> int:
+        statement = select(func.count()).select_from(User)
+        result = await self.session.execute(statement)
+        return int(result.scalar_one())
 
     async def delete(self, user_id: uuid.UUID) -> bool:
         user = await self.get_by_id(user_id)

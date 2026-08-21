@@ -26,5 +26,9 @@ class IUserRepository(ABC):
         pass
 
     @abstractmethod
+    async def count_all(self) -> int:
+        pass
+
+    @abstractmethod
     async def delete(self, user_id: uuid.UUID) -> bool:
         pass

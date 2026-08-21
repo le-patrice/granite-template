@@ -1,10 +1,10 @@
 """
-Authentication controller.
+Authentication controller providing JWT bearer token issuance and revocation.
 
-POST /api/v1/auth/login   – OAuth2 & JSON password exchange → JWT bearer token
-POST /api/v1/auth/token   – OAuth2 standard alias
-POST /api/v1/auth/logout  – invalidate current session token (JWT required)
+Adheres strictly to RFC 6749 OAuth2 Password Flow and JSON payload login.
 """
+
+from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import ClassVar
@@ -71,10 +71,10 @@ class AuthController(Controller):
         if not user or not await verify_password_async(str(password), user.hashed_password):
             raise NotAuthorizedException("Incorrect email or password.")
 
-        token = create_access_token(
-            subject=str(user.id),
-            is_superuser=bool(user.is_superuser),
-        )
+        if not user.is_active:
+            raise NotAuthorizedException("User account is inactive.")
+
+        token = create_access_token(subject=str(user.id), is_superuser=user.is_superuser)
         return TokenResponse(
             access_token=token,
             token_type="bearer",
@@ -85,24 +85,19 @@ class AuthController(Controller):
         path="/logout",
         guards=[JWTAuthGuard()],
         status_code=HTTP_200_OK,
-        summary="Revoke current session",
-        description=(
-            "Adds the current token's JTI to the Valkey revocation blocklist. "
-            "Subsequent requests with the same token will be rejected with 401."
-        ),
+        summary="Revoke bearer token",
+        description="Revoke the calling bearer token and invalidate in cache store.",
     )
-    async def logout(self, request: Request) -> dict:
-        jti: str = request.scope.get("token_jti", "")
+    async def logout(self, request: Request) -> dict[str, str]:
         auth_header = request.headers.get("Authorization", "")
-        token = auth_header[len("Bearer ") :]
-        try:
-            payload = decode_access_token(token)
-            exp = payload.get("exp", 0)
-            remaining = max(1, int(exp - datetime.now(UTC).timestamp()))
-        except Exception:  # noqa: BLE001
-            remaining = 3600  # fallback: 1 h
-
-        if jti:
-            await revoke_token(jti, expires_in=remaining)
-
-        return {"detail": "Session revoked successfully."}
+        if auth_header.startswith("Bearer "):
+            token = auth_header.removeprefix("Bearer ").strip()
+            claims = decode_access_token(token)
+            if claims and "jti" in claims:
+                exp = claims.get("exp", 0)
+                now = datetime.now(UTC).timestamp()
+                remaining = (
+                    max(1, int(exp - now)) if exp else settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+                )
+                await revoke_token(claims["jti"], expires_in=remaining)
+        return {"detail": "Token successfully revoked."}

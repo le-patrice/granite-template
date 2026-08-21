@@ -32,7 +32,7 @@ def setup_logging() -> None:
     log_level = logging.DEBUG if settings.DEBUG else logging.INFO
 
     logging.basicConfig(
-        format="%(message)s",
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         level=log_level,
         handlers=handlers,
         force=True,
@@ -50,7 +50,7 @@ def setup_logging() -> None:
     if settings.ENVIRONMENT == "production":
         processors = shared_processors + [structlog.processors.JSONRenderer()]
     else:
-        processors = shared_processors + [structlog.dev.ConsoleRenderer()]
+        processors = shared_processors + [structlog.dev.ConsoleRenderer(colors=True)]
 
     structlog.configure(
         processors=processors,
@@ -68,7 +68,7 @@ class RequestLoggingMiddleware(AbstractMiddleware):
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
-        self.logger = logging.getLogger("litestar")
+        self.logger = structlog.get_logger("api.access")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != ScopeType.HTTP:
@@ -77,6 +77,8 @@ class RequestLoggingMiddleware(AbstractMiddleware):
 
         path = scope.get("path", "")
         method = scope.get("method", "GET")
+        client = scope.get("client")
+        client_ip = client[0] if client else "127.0.0.1"
         start_time = time.monotonic()
         status_code = 200
 
@@ -90,6 +92,8 @@ class RequestLoggingMiddleware(AbstractMiddleware):
             await self.app(scope, receive, tracking_send)
         finally:
             duration_ms = round((time.monotonic() - start_time) * 1000, 2)
-            self.logger.info(
-                f"{method} {path} HTTP/{scope.get('http_version', '1.1')} {status_code} ({duration_ms}ms)"
+            # Instantly flush log line to standard stdout for docker/podman logs
+            sys.stdout.write(
+                f'[INFO] {client_ip} - "{method} {path} HTTP/{scope.get("http_version", "1.1")}" {status_code} ({duration_ms}ms)\n'
             )
+            sys.stdout.flush()
