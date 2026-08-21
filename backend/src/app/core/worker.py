@@ -10,7 +10,7 @@ Features
     • prune_expired_sessions: Database and Valkey cleanup.
     • process_batch_export: High-throughput batch dataset export.
 3.  Cron schedules for automatic background grooming & aggregation.
-4.  CLI runner compatible with `python -m saq app.core.worker.worker_settings --workers 4`.
+4.  CLI runner compatible with `python -m saq app.core.worker.settings --workers 4`.
 """
 
 from __future__ import annotations
@@ -22,14 +22,17 @@ import structlog
 from saq import CronJob, Queue
 from saq.types import Context
 
-from app.core.settings import settings
+from app.core.settings import settings as app_settings
 
 logger = structlog.get_logger()
+
+# cron alias for CronJob
+cron = CronJob
 
 # ---------------------------------------------------------------------------
 # Valkey / Redis URL connection
 # ---------------------------------------------------------------------------
-VALKEY_URL = f"redis://{settings.VALKEY_HOST}:{settings.VALKEY_PORT}/0"
+VALKEY_URL = f"redis://{app_settings.VALKEY_HOST}:{app_settings.VALKEY_PORT}/0"
 
 # Main distributed queue
 queue = Queue.from_url(VALKEY_URL, name="default")
@@ -143,10 +146,10 @@ cron_jobs = [
 ]
 
 # ---------------------------------------------------------------------------
-# SAQ Worker Configuration Dict (read by `python -m saq app.core.worker.worker_settings`)
+# SAQ Worker Configuration Dict (read by `python -m saq app.core.worker.settings`)
 # ---------------------------------------------------------------------------
 
-worker_settings = {
+settings = {
     "queue": queue,
     "functions": [
         send_transactional_email,
@@ -154,6 +157,9 @@ worker_settings = {
         prune_expired_sessions,
         process_batch_export,
     ],
-    "cron": cron_jobs,
+    "cron_jobs": cron_jobs,
     "concurrency": 4,
 }
+
+# Alias for backwards compatibility
+worker_settings = settings

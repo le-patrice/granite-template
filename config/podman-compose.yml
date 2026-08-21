@@ -156,7 +156,7 @@ services:
       dockerfile: ../config/Containerfile
     container_name: worker_app
     restart: unless-stopped
-    command: ["python", "-m", "saq", "app.core.worker.worker_settings", "--workers", "4"]
+    command: ["python", "-m", "saq", "app.core.worker.settings", "--workers", "4"]
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
