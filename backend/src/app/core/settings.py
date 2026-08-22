@@ -45,9 +45,11 @@ class AppSettings(BaseSettings):
     # ── API Documentation UI ──────────────────────────────────────────────────
     DOCS_UI: str = "swagger"  # swagger | scalar | redoc | elements | rapidoc
 
-    # ── Observability & Crash Reporting ───────────────────────────────────────
-    SENTRY_DSN: str | None = None
-    SENTRY_TRACES_SAMPLE_RATE: float = 1.0
+    # ── Observability & Crash Reporting (Sentry) ──────────────────────────────
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "development"
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.1
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

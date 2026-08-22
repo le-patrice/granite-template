@@ -17,6 +17,36 @@ setup_logging()
 logger = structlog.get_logger("app.bootstrap")
 
 
+def init_sentry() -> None:
+    """Initialize Sentry APM and error tracking if DSN is configured."""
+    if not settings.SENTRY_DSN:
+        return
+
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.litestar import LitestarIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.SENTRY_ENVIRONMENT,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+            integrations=[
+                LitestarIntegration(),
+                SqlalchemyIntegration(),
+            ],
+            send_default_pii=False,
+        )
+        logger.info("sentry.initialized", environment=settings.SENTRY_ENVIRONMENT)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sentry.init_failed", error=str(exc))
+
+
+# Initialize Sentry before app construction
+init_sentry()
+
+
 async def init_admin_user() -> None:
     """Ensure initial superuser exists upon platform startup."""
     try:

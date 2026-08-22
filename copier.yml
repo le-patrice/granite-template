@@ -145,6 +145,17 @@ include_prometheus_metrics:
   help: "Expose /metrics endpoint for Prometheus scrapers & latency percentile tracking"
   default: true
 
+include_sentry:
+  type: bool
+  help: "Enable Sentry centralized error tracking & APM instrumentation?"
+  default: false
+
+sentry_dsn:
+  type: str
+  help: "Sentry Project DSN (leave empty if configuring later):"
+  default: ""
+  when: "{{ include_sentry }}"
+
 include_traefik:
   type: bool
   help: "Include Traefik v3 reverse proxy gateway for unified /api, /docs, and frontend routing"
