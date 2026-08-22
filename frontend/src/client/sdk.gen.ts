@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiV1AuthLoginLoginData, ApiV1AuthLoginLoginResponses, ApiV1AuthLogoutLogoutData, ApiV1AuthLogoutLogoutResponses, ApiV1AuthTokenLoginData, ApiV1AuthTokenLoginResponses, ApiV1TelemetryIngestIngestData, ApiV1TelemetryIngestIngestErrors, ApiV1TelemetryIngestIngestResponses, ApiV1UsersCreateUserAdminData, ApiV1UsersCreateUserAdminErrors, ApiV1UsersCreateUserAdminResponses, ApiV1UsersListUsersData, ApiV1UsersListUsersErrors, ApiV1UsersListUsersResponses, ApiV1UsersMeDeleteMeData, ApiV1UsersMeDeleteMeResponses, ApiV1UsersMeGetMeData, ApiV1UsersMeGetMeResponses, ApiV1UsersMePasswordUpdatePasswordMeData, ApiV1UsersMePasswordUpdatePasswordMeErrors, ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMeUpdateMeData, ApiV1UsersMeUpdateMeErrors, ApiV1UsersMeUpdateMeResponses, ApiV1UsersRegisterRegisterData, ApiV1UsersRegisterRegisterErrors, ApiV1UsersRegisterRegisterResponses, ApiV1UsersSignupRegisterData, ApiV1UsersSignupRegisterErrors, ApiV1UsersSignupRegisterResponses, ApiV1UsersUserIdDeleteUserData, ApiV1UsersUserIdDeleteUserErrors, ApiV1UsersUserIdDeleteUserResponses, ApiV1UsersUserIdGetUserByIdData, ApiV1UsersUserIdGetUserByIdErrors, ApiV1UsersUserIdGetUserByIdResponses, ApiV1UsersUserIdRoleUpdateUserAdminData, ApiV1UsersUserIdRoleUpdateUserAdminErrors, ApiV1UsersUserIdRoleUpdateUserAdminResponses, ApiV1UsersUserIdUpdateUserAdminData, ApiV1UsersUserIdUpdateUserAdminErrors, ApiV1UsersUserIdUpdateUserAdminResponses, ApiV1UtilsHealthCheckHealthCheckData, ApiV1UtilsHealthCheckHealthCheckResponses, ApiV1UtilsTestEmailTestEmailData, ApiV1UtilsTestEmailTestEmailErrors, ApiV1UtilsTestEmailTestEmailResponses, HealthGetHealthData, HealthGetHealthResponses, HealthLiveGetLivenessData, HealthLiveGetLivenessResponses, HealthReadyGetReadinessData, HealthReadyGetReadinessResponses, HealthStartupGetStartupData, HealthStartupGetStartupResponses, MetricsMetricsEndpointData, MetricsMetricsEndpointResponses } from './types.gen';
+import type { ApiV1AuthLoginLoginData, ApiV1AuthLoginLoginResponses, ApiV1AuthLogoutLogoutData, ApiV1AuthLogoutLogoutResponses, ApiV1AuthTokenTokenData, ApiV1AuthTokenTokenResponses, ApiV1TelemetryIngestIngestData, ApiV1TelemetryIngestIngestErrors, ApiV1TelemetryIngestIngestResponses, ApiV1UsersCreateUserAdminData, ApiV1UsersCreateUserAdminErrors, ApiV1UsersCreateUserAdminResponses, ApiV1UsersListUsersData, ApiV1UsersListUsersErrors, ApiV1UsersListUsersResponses, ApiV1UsersMeDeleteMeData, ApiV1UsersMeDeleteMeResponses, ApiV1UsersMeGetMeData, ApiV1UsersMeGetMeResponses, ApiV1UsersMePasswordUpdatePasswordMeData, ApiV1UsersMePasswordUpdatePasswordMeErrors, ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMeUpdateMeData, ApiV1UsersMeUpdateMeErrors, ApiV1UsersMeUpdateMeResponses, ApiV1UsersRegisterRegisterData, ApiV1UsersRegisterRegisterErrors, ApiV1UsersRegisterRegisterResponses, ApiV1UsersSignupRegisterData, ApiV1UsersSignupRegisterErrors, ApiV1UsersSignupRegisterResponses, ApiV1UsersUserIdDeleteUserData, ApiV1UsersUserIdDeleteUserErrors, ApiV1UsersUserIdDeleteUserResponses, ApiV1UsersUserIdGetUserByIdData, ApiV1UsersUserIdGetUserByIdErrors, ApiV1UsersUserIdGetUserByIdResponses, ApiV1UsersUserIdRoleUpdateUserAdminData, ApiV1UsersUserIdRoleUpdateUserAdminErrors, ApiV1UsersUserIdRoleUpdateUserAdminResponses, ApiV1UsersUserIdUpdateUserAdminData, ApiV1UsersUserIdUpdateUserAdminErrors, ApiV1UsersUserIdUpdateUserAdminResponses, ApiV1UtilsHealthCheckHealthCheckData, ApiV1UtilsHealthCheckHealthCheckResponses, ApiV1UtilsTestEmailTestEmailData, ApiV1UtilsTestEmailTestEmailErrors, ApiV1UtilsTestEmailTestEmailResponses, HealthGetHealthData, HealthGetHealthResponses, HealthLiveGetLivenessData, HealthLiveGetLivenessResponses, HealthReadyGetReadinessData, HealthReadyGetReadinessResponses, HealthStartupGetStartupData, HealthStartupGetStartupResponses, MetricsMetricsEndpointData, MetricsMetricsEndpointResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -133,25 +133,6 @@ export const apiV1AuthLoginLogin = <ThrowOnError extends boolean = false>(option
 });
 
 /**
- * Obtain bearer token
- *
- * Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.
- */
-export const apiV1AuthTokenLogin = <ThrowOnError extends boolean = false>(options?: Options<ApiV1AuthTokenLoginData, ThrowOnError>): RequestResult<ApiV1AuthTokenLoginResponses, unknown, ThrowOnError> => (options?.client ?? client).post<ApiV1AuthTokenLoginResponses, unknown, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/api/v1/auth/token',
-    ...options
-});
-
-/**
  * Revoke bearer token
  *
  * Revoke the calling bearer token and invalidate in cache store.
@@ -167,6 +148,25 @@ export const apiV1AuthLogoutLogout = <ThrowOnError extends boolean = false>(opti
             type: 'http'
         }],
     url: '/api/v1/auth/logout',
+    ...options
+});
+
+/**
+ * OAuth2 Token Endpoint
+ *
+ * RFC 6749 standard OAuth2 /token endpoint for Swagger UI & automated tools.
+ */
+export const apiV1AuthTokenToken = <ThrowOnError extends boolean = false>(options?: Options<ApiV1AuthTokenTokenData, ThrowOnError>): RequestResult<ApiV1AuthTokenTokenResponses, unknown, ThrowOnError> => (options?.client ?? client).post<ApiV1AuthTokenTokenResponses, unknown, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/api/v1/auth/token',
     ...options
 });
 

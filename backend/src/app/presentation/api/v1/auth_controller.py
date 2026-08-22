@@ -37,13 +37,7 @@ class AuthController(Controller):
     path = "/auth"
     dependencies: ClassVar[dict[str, Provide]] = {"user_repo": Provide(provide_user_repo)}
 
-    @post(
-        path=["/login", "/token"],
-        status_code=HTTP_201_CREATED,
-        summary="Obtain bearer token",
-        description="Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.",
-    )
-    async def login(
+    async def _authenticate(
         self,
         request: Request,
         user_repo: IUserRepository,
@@ -80,6 +74,32 @@ class AuthController(Controller):
             token_type="bearer",
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
+
+    @post(
+        path="/login",
+        status_code=HTTP_201_CREATED,
+        summary="Obtain bearer token",
+        description="Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.",
+    )
+    async def login(
+        self,
+        request: Request,
+        user_repo: IUserRepository,
+    ) -> TokenResponse:
+        return await self._authenticate(request, user_repo)
+
+    @post(
+        path="/token",
+        status_code=HTTP_201_CREATED,
+        summary="OAuth2 Token Endpoint",
+        description="RFC 6749 standard OAuth2 /token endpoint for Swagger UI & automated tools.",
+    )
+    async def token(
+        self,
+        request: Request,
+        user_repo: IUserRepository,
+    ) -> TokenResponse:
+        return await self._authenticate(request, user_repo)
 
     @post(
         path="/logout",

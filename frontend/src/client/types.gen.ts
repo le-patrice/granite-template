@@ -203,22 +203,6 @@ export type ApiV1AuthLoginLoginResponses = {
 
 export type ApiV1AuthLoginLoginResponse = ApiV1AuthLoginLoginResponses[keyof ApiV1AuthLoginLoginResponses];
 
-export type ApiV1AuthTokenLoginData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/auth/token';
-};
-
-export type ApiV1AuthTokenLoginResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: TokenResponse;
-};
-
-export type ApiV1AuthTokenLoginResponse = ApiV1AuthTokenLoginResponses[keyof ApiV1AuthTokenLoginResponses];
-
 export type ApiV1AuthLogoutLogoutData = {
     body?: never;
     path?: never;
@@ -236,6 +220,22 @@ export type ApiV1AuthLogoutLogoutResponses = {
 };
 
 export type ApiV1AuthLogoutLogoutResponse = ApiV1AuthLogoutLogoutResponses[keyof ApiV1AuthLogoutLogoutResponses];
+
+export type ApiV1AuthTokenTokenData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/token';
+};
+
+export type ApiV1AuthTokenTokenResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: TokenResponse;
+};
+
+export type ApiV1AuthTokenTokenResponse = ApiV1AuthTokenTokenResponses[keyof ApiV1AuthTokenTokenResponses];
 
 export type ApiV1UsersListUsersData = {
     body?: never;

@@ -148,27 +148,6 @@
         "deprecated": false
       }
     },
-    "/api/v1/auth/token": {
-      "post": {
-        "summary": "Obtain bearer token",
-        "description": "Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.",
-        "operationId": "ApiV1AuthTokenLogin",
-        "responses": {
-          "201": {
-            "description": "Document created, URL follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TokenResponse"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
     "/api/v1/auth/logout": {
       "post": {
         "summary": "Revoke bearer token",
@@ -185,6 +164,27 @@
                     "type": "string"
                   },
                   "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": false
+      }
+    },
+    "/api/v1/auth/token": {
+      "post": {
+        "summary": "OAuth2 Token Endpoint",
+        "description": "RFC 6749 standard OAuth2 /token endpoint for Swagger UI & automated tools.",
+        "operationId": "ApiV1AuthTokenToken",
+        "responses": {
+          "201": {
+            "description": "Document created, URL follows",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
                 }
               }
             }
