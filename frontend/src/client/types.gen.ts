@@ -15,12 +15,12 @@ export type Message = {
  * TelemetryRecord
  */
 export type TelemetryRecord = {
+    current_a: number;
+    frequency_hz: number;
+    power_factor: number;
+    timestamp_epoch: number;
     transformer_id: string;
     voltage_v: number;
-    current_a: number;
-    power_factor: number;
-    frequency_hz: number;
-    timestamp_epoch: number;
 };
 
 /**
@@ -28,8 +28,8 @@ export type TelemetryRecord = {
  */
 export type TokenResponse = {
     access_token: string;
-    token_type?: string;
     expires_in?: number;
+    token_type?: string;
 };
 
 /**
@@ -45,21 +45,21 @@ export type UpdatePassword = {
  */
 export type UserAdminCreate = {
     email: string;
-    password: string;
     full_name: string;
     is_active?: boolean;
     is_superuser?: boolean;
+    password: string;
 };
 
 /**
  * UserAdminUpdate
  */
 export type UserAdminUpdate = {
-    full_name?: string | null;
     email?: string | null;
-    password?: string | null;
+    full_name?: string | null;
     is_active?: boolean | null;
     is_superuser?: boolean | null;
+    password?: string | null;
 };
 
 /**
@@ -67,17 +67,17 @@ export type UserAdminUpdate = {
  */
 export type UserCreate = {
     email: string;
-    password: string;
     full_name: string;
+    password: string;
 };
 
 /**
  * UserRead
  */
 export type UserRead = {
-    id: string;
     email: string;
     full_name: string;
+    id: string;
     is_active: boolean;
     is_superuser: boolean;
 };
@@ -86,8 +86,8 @@ export type UserRead = {
  * UserUpdateMe
  */
 export type UserUpdateMe = {
-    full_name?: string | null;
     email?: string | null;
+    full_name?: string | null;
     password?: string | null;
 };
 
@@ -95,9 +95,496 @@ export type UserUpdateMe = {
  * UsersPublic
  */
 export type UsersPublic = {
-    data: Array<UserRead>;
     count: number;
+    data: Array<UserRead>;
 };
+
+export type ApiV1AuthLoginLoginData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/login';
+};
+
+export type ApiV1AuthLoginLoginResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: TokenResponse;
+};
+
+export type ApiV1AuthLoginLoginResponse = ApiV1AuthLoginLoginResponses[keyof ApiV1AuthLoginLoginResponses];
+
+export type ApiV1AuthLogoutLogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/logout';
+};
+
+export type ApiV1AuthLogoutLogoutResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: {
+        [key: string]: string;
+    };
+};
+
+export type ApiV1AuthLogoutLogoutResponse = ApiV1AuthLogoutLogoutResponses[keyof ApiV1AuthLogoutLogoutResponses];
+
+export type ApiV1AuthTokenTokenData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/token';
+};
+
+export type ApiV1AuthTokenTokenResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: TokenResponse;
+};
+
+export type ApiV1AuthTokenTokenResponse = ApiV1AuthTokenTokenResponses[keyof ApiV1AuthTokenTokenResponses];
+
+export type ApiV1TelemetryIngestIngestData = {
+    body: Array<TelemetryRecord>;
+    path?: never;
+    query?: never;
+    url: '/api/v1/telemetry/ingest';
+};
+
+export type ApiV1TelemetryIngestIngestErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1TelemetryIngestIngestError = ApiV1TelemetryIngestIngestErrors[keyof ApiV1TelemetryIngestIngestErrors];
+
+export type ApiV1TelemetryIngestIngestResponses = {
+    /**
+     * Request accepted, processing continues off-line
+     */
+    202: {
+        [key: string]: unknown;
+    };
+};
+
+export type ApiV1TelemetryIngestIngestResponse = ApiV1TelemetryIngestIngestResponses[keyof ApiV1TelemetryIngestIngestResponses];
+
+export type ApiV1UsersListUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        skip?: number;
+        limit?: number;
+    };
+    url: '/api/v1/users';
+};
+
+export type ApiV1UsersListUsersErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersListUsersError = ApiV1UsersListUsersErrors[keyof ApiV1UsersListUsersErrors];
+
+export type ApiV1UsersListUsersResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: UsersPublic;
+};
+
+export type ApiV1UsersListUsersResponse = ApiV1UsersListUsersResponses[keyof ApiV1UsersListUsersResponses];
+
+export type ApiV1UsersCreateUserAdminData = {
+    body: UserAdminCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users';
+};
+
+export type ApiV1UsersCreateUserAdminErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersCreateUserAdminError = ApiV1UsersCreateUserAdminErrors[keyof ApiV1UsersCreateUserAdminErrors];
+
+export type ApiV1UsersCreateUserAdminResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: UserRead;
+};
+
+export type ApiV1UsersCreateUserAdminResponse = ApiV1UsersCreateUserAdminResponses[keyof ApiV1UsersCreateUserAdminResponses];
+
+export type ApiV1UsersMeDeleteMeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me';
+};
+
+export type ApiV1UsersMeDeleteMeResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: Message;
+};
+
+export type ApiV1UsersMeDeleteMeResponse = ApiV1UsersMeDeleteMeResponses[keyof ApiV1UsersMeDeleteMeResponses];
+
+export type ApiV1UsersMeGetMeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me';
+};
+
+export type ApiV1UsersMeGetMeResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: UserRead;
+};
+
+export type ApiV1UsersMeGetMeResponse = ApiV1UsersMeGetMeResponses[keyof ApiV1UsersMeGetMeResponses];
+
+export type ApiV1UsersMeUpdateMeData = {
+    body: UserUpdateMe;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me';
+};
+
+export type ApiV1UsersMeUpdateMeErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersMeUpdateMeError = ApiV1UsersMeUpdateMeErrors[keyof ApiV1UsersMeUpdateMeErrors];
+
+export type ApiV1UsersMeUpdateMeResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: UserRead;
+};
+
+export type ApiV1UsersMeUpdateMeResponse = ApiV1UsersMeUpdateMeResponses[keyof ApiV1UsersMeUpdateMeResponses];
+
+export type ApiV1UsersMePasswordUpdatePasswordMeData = {
+    body: UpdatePassword;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/me/password';
+};
+
+export type ApiV1UsersMePasswordUpdatePasswordMeErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersMePasswordUpdatePasswordMeError = ApiV1UsersMePasswordUpdatePasswordMeErrors[keyof ApiV1UsersMePasswordUpdatePasswordMeErrors];
+
+export type ApiV1UsersMePasswordUpdatePasswordMeResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: Message;
+};
+
+export type ApiV1UsersMePasswordUpdatePasswordMeResponse = ApiV1UsersMePasswordUpdatePasswordMeResponses[keyof ApiV1UsersMePasswordUpdatePasswordMeResponses];
+
+export type ApiV1UsersRegisterRegisterData = {
+    body: UserCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/register';
+};
+
+export type ApiV1UsersRegisterRegisterErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersRegisterRegisterError = ApiV1UsersRegisterRegisterErrors[keyof ApiV1UsersRegisterRegisterErrors];
+
+export type ApiV1UsersRegisterRegisterResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: UserRead;
+};
+
+export type ApiV1UsersRegisterRegisterResponse = ApiV1UsersRegisterRegisterResponses[keyof ApiV1UsersRegisterRegisterResponses];
+
+export type ApiV1UsersSignupSignupData = {
+    body: UserCreate;
+    path?: never;
+    query?: never;
+    url: '/api/v1/users/signup';
+};
+
+export type ApiV1UsersSignupSignupErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersSignupSignupError = ApiV1UsersSignupSignupErrors[keyof ApiV1UsersSignupSignupErrors];
+
+export type ApiV1UsersSignupSignupResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: UserRead;
+};
+
+export type ApiV1UsersSignupSignupResponse = ApiV1UsersSignupSignupResponses[keyof ApiV1UsersSignupSignupResponses];
+
+export type ApiV1UsersUserIdDeleteUserData = {
+    body?: never;
+    path: {
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{user_id}';
+};
+
+export type ApiV1UsersUserIdDeleteUserErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersUserIdDeleteUserError = ApiV1UsersUserIdDeleteUserErrors[keyof ApiV1UsersUserIdDeleteUserErrors];
+
+export type ApiV1UsersUserIdDeleteUserResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: Message;
+};
+
+export type ApiV1UsersUserIdDeleteUserResponse = ApiV1UsersUserIdDeleteUserResponses[keyof ApiV1UsersUserIdDeleteUserResponses];
+
+export type ApiV1UsersUserIdGetUserByIdData = {
+    body?: never;
+    path: {
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{user_id}';
+};
+
+export type ApiV1UsersUserIdGetUserByIdErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersUserIdGetUserByIdError = ApiV1UsersUserIdGetUserByIdErrors[keyof ApiV1UsersUserIdGetUserByIdErrors];
+
+export type ApiV1UsersUserIdGetUserByIdResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: UserRead;
+};
+
+export type ApiV1UsersUserIdGetUserByIdResponse = ApiV1UsersUserIdGetUserByIdResponses[keyof ApiV1UsersUserIdGetUserByIdResponses];
+
+export type ApiV1UsersUserIdUpdateUserAdminData = {
+    body: UserAdminUpdate;
+    path: {
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{user_id}';
+};
+
+export type ApiV1UsersUserIdUpdateUserAdminErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersUserIdUpdateUserAdminError = ApiV1UsersUserIdUpdateUserAdminErrors[keyof ApiV1UsersUserIdUpdateUserAdminErrors];
+
+export type ApiV1UsersUserIdUpdateUserAdminResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: UserRead;
+};
+
+export type ApiV1UsersUserIdUpdateUserAdminResponse = ApiV1UsersUserIdUpdateUserAdminResponses[keyof ApiV1UsersUserIdUpdateUserAdminResponses];
+
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminData = {
+    body: UserAdminUpdate;
+    path: {
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{user_id}/role';
+};
+
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminError = ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors[keyof ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors];
+
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: UserRead;
+};
+
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminResponse = ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses[keyof ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses];
+
+export type ApiV1UtilsHealthCheckHealthCheckData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/utils/health-check';
+};
+
+export type ApiV1UtilsHealthCheckHealthCheckResponses = {
+    /**
+     * Request fulfilled, document follows
+     */
+    200: boolean;
+};
+
+export type ApiV1UtilsHealthCheckHealthCheckResponse = ApiV1UtilsHealthCheckHealthCheckResponses[keyof ApiV1UtilsHealthCheckHealthCheckResponses];
+
+export type ApiV1UtilsTestEmailTestEmailData = {
+    body: {
+        [key: string]: unknown;
+    } | null;
+    path?: never;
+    query?: {
+        email_to?: string | null;
+    };
+    url: '/api/v1/utils/test-email';
+};
+
+export type ApiV1UtilsTestEmailTestEmailErrors = {
+    /**
+     * Validation Exception
+     */
+    400: {
+        detail: string;
+        extra?: null | {
+            [key: string]: unknown;
+        } | Array<unknown>;
+        status_code: number;
+    };
+};
+
+export type ApiV1UtilsTestEmailTestEmailError = ApiV1UtilsTestEmailTestEmailErrors[keyof ApiV1UtilsTestEmailTestEmailErrors];
+
+export type ApiV1UtilsTestEmailTestEmailResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: Message;
+};
+
+export type ApiV1UtilsTestEmailTestEmailResponse = ApiV1UtilsTestEmailTestEmailResponses[keyof ApiV1UtilsTestEmailTestEmailResponses];
 
 export type HealthGetHealthData = {
     body?: never;
@@ -186,490 +673,3 @@ export type MetricsMetricsEndpointResponses = {
 };
 
 export type MetricsMetricsEndpointResponse = MetricsMetricsEndpointResponses[keyof MetricsMetricsEndpointResponses];
-
-export type ApiV1AuthLoginLoginData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/auth/login';
-};
-
-export type ApiV1AuthLoginLoginResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: TokenResponse;
-};
-
-export type ApiV1AuthLoginLoginResponse = ApiV1AuthLoginLoginResponses[keyof ApiV1AuthLoginLoginResponses];
-
-export type ApiV1AuthLogoutLogoutData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/auth/logout';
-};
-
-export type ApiV1AuthLogoutLogoutResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: {
-        [key: string]: string;
-    };
-};
-
-export type ApiV1AuthLogoutLogoutResponse = ApiV1AuthLogoutLogoutResponses[keyof ApiV1AuthLogoutLogoutResponses];
-
-export type ApiV1AuthTokenTokenData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/auth/token';
-};
-
-export type ApiV1AuthTokenTokenResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: TokenResponse;
-};
-
-export type ApiV1AuthTokenTokenResponse = ApiV1AuthTokenTokenResponses[keyof ApiV1AuthTokenTokenResponses];
-
-export type ApiV1UsersListUsersData = {
-    body?: never;
-    path?: never;
-    query?: {
-        skip?: number;
-        limit?: number;
-    };
-    url: '/api/v1/users';
-};
-
-export type ApiV1UsersListUsersErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersListUsersError = ApiV1UsersListUsersErrors[keyof ApiV1UsersListUsersErrors];
-
-export type ApiV1UsersListUsersResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: UsersPublic;
-};
-
-export type ApiV1UsersListUsersResponse = ApiV1UsersListUsersResponses[keyof ApiV1UsersListUsersResponses];
-
-export type ApiV1UsersCreateUserAdminData = {
-    body: UserAdminCreate;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users';
-};
-
-export type ApiV1UsersCreateUserAdminErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersCreateUserAdminError = ApiV1UsersCreateUserAdminErrors[keyof ApiV1UsersCreateUserAdminErrors];
-
-export type ApiV1UsersCreateUserAdminResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: UserRead;
-};
-
-export type ApiV1UsersCreateUserAdminResponse = ApiV1UsersCreateUserAdminResponses[keyof ApiV1UsersCreateUserAdminResponses];
-
-export type ApiV1UsersMeDeleteMeData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/me';
-};
-
-export type ApiV1UsersMeDeleteMeResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: Message;
-};
-
-export type ApiV1UsersMeDeleteMeResponse = ApiV1UsersMeDeleteMeResponses[keyof ApiV1UsersMeDeleteMeResponses];
-
-export type ApiV1UsersMeGetMeData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/me';
-};
-
-export type ApiV1UsersMeGetMeResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: UserRead;
-};
-
-export type ApiV1UsersMeGetMeResponse = ApiV1UsersMeGetMeResponses[keyof ApiV1UsersMeGetMeResponses];
-
-export type ApiV1UsersMeUpdateMeData = {
-    body: UserUpdateMe;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/me';
-};
-
-export type ApiV1UsersMeUpdateMeErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersMeUpdateMeError = ApiV1UsersMeUpdateMeErrors[keyof ApiV1UsersMeUpdateMeErrors];
-
-export type ApiV1UsersMeUpdateMeResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: UserRead;
-};
-
-export type ApiV1UsersMeUpdateMeResponse = ApiV1UsersMeUpdateMeResponses[keyof ApiV1UsersMeUpdateMeResponses];
-
-export type ApiV1UsersUserIdDeleteUserData = {
-    body?: never;
-    path: {
-        user_id: string;
-    };
-    query?: never;
-    url: '/api/v1/users/{user_id}';
-};
-
-export type ApiV1UsersUserIdDeleteUserErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersUserIdDeleteUserError = ApiV1UsersUserIdDeleteUserErrors[keyof ApiV1UsersUserIdDeleteUserErrors];
-
-export type ApiV1UsersUserIdDeleteUserResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: Message;
-};
-
-export type ApiV1UsersUserIdDeleteUserResponse = ApiV1UsersUserIdDeleteUserResponses[keyof ApiV1UsersUserIdDeleteUserResponses];
-
-export type ApiV1UsersUserIdGetUserByIdData = {
-    body?: never;
-    path: {
-        user_id: string;
-    };
-    query?: never;
-    url: '/api/v1/users/{user_id}';
-};
-
-export type ApiV1UsersUserIdGetUserByIdErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersUserIdGetUserByIdError = ApiV1UsersUserIdGetUserByIdErrors[keyof ApiV1UsersUserIdGetUserByIdErrors];
-
-export type ApiV1UsersUserIdGetUserByIdResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: UserRead;
-};
-
-export type ApiV1UsersUserIdGetUserByIdResponse = ApiV1UsersUserIdGetUserByIdResponses[keyof ApiV1UsersUserIdGetUserByIdResponses];
-
-export type ApiV1UsersUserIdUpdateUserAdminData = {
-    body: UserAdminUpdate;
-    path: {
-        user_id: string;
-    };
-    query?: never;
-    url: '/api/v1/users/{user_id}';
-};
-
-export type ApiV1UsersUserIdUpdateUserAdminErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersUserIdUpdateUserAdminError = ApiV1UsersUserIdUpdateUserAdminErrors[keyof ApiV1UsersUserIdUpdateUserAdminErrors];
-
-export type ApiV1UsersUserIdUpdateUserAdminResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: UserRead;
-};
-
-export type ApiV1UsersUserIdUpdateUserAdminResponse = ApiV1UsersUserIdUpdateUserAdminResponses[keyof ApiV1UsersUserIdUpdateUserAdminResponses];
-
-export type ApiV1UsersRegisterRegisterData = {
-    body: UserCreate;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/register';
-};
-
-export type ApiV1UsersRegisterRegisterErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersRegisterRegisterError = ApiV1UsersRegisterRegisterErrors[keyof ApiV1UsersRegisterRegisterErrors];
-
-export type ApiV1UsersRegisterRegisterResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: UserRead;
-};
-
-export type ApiV1UsersRegisterRegisterResponse = ApiV1UsersRegisterRegisterResponses[keyof ApiV1UsersRegisterRegisterResponses];
-
-export type ApiV1UsersSignupSignupData = {
-    body: UserCreate;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/signup';
-};
-
-export type ApiV1UsersSignupSignupErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersSignupSignupError = ApiV1UsersSignupSignupErrors[keyof ApiV1UsersSignupSignupErrors];
-
-export type ApiV1UsersSignupSignupResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: UserRead;
-};
-
-export type ApiV1UsersSignupSignupResponse = ApiV1UsersSignupSignupResponses[keyof ApiV1UsersSignupSignupResponses];
-
-export type ApiV1UsersMePasswordUpdatePasswordMeData = {
-    body: UpdatePassword;
-    path?: never;
-    query?: never;
-    url: '/api/v1/users/me/password';
-};
-
-export type ApiV1UsersMePasswordUpdatePasswordMeErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersMePasswordUpdatePasswordMeError = ApiV1UsersMePasswordUpdatePasswordMeErrors[keyof ApiV1UsersMePasswordUpdatePasswordMeErrors];
-
-export type ApiV1UsersMePasswordUpdatePasswordMeResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: Message;
-};
-
-export type ApiV1UsersMePasswordUpdatePasswordMeResponse = ApiV1UsersMePasswordUpdatePasswordMeResponses[keyof ApiV1UsersMePasswordUpdatePasswordMeResponses];
-
-export type ApiV1UsersUserIdRoleUpdateUserRoleAdminData = {
-    body: UserAdminUpdate;
-    path: {
-        user_id: string;
-    };
-    query?: never;
-    url: '/api/v1/users/{user_id}/role';
-};
-
-export type ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UsersUserIdRoleUpdateUserRoleAdminError = ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors[keyof ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors];
-
-export type ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: UserRead;
-};
-
-export type ApiV1UsersUserIdRoleUpdateUserRoleAdminResponse = ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses[keyof ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses];
-
-export type ApiV1TelemetryIngestIngestData = {
-    body: Array<TelemetryRecord>;
-    path?: never;
-    query?: never;
-    url: '/api/v1/telemetry/ingest';
-};
-
-export type ApiV1TelemetryIngestIngestErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1TelemetryIngestIngestError = ApiV1TelemetryIngestIngestErrors[keyof ApiV1TelemetryIngestIngestErrors];
-
-export type ApiV1TelemetryIngestIngestResponses = {
-    /**
-     * Request accepted, processing continues off-line
-     */
-    202: {
-        [key: string]: unknown;
-    };
-};
-
-export type ApiV1TelemetryIngestIngestResponse = ApiV1TelemetryIngestIngestResponses[keyof ApiV1TelemetryIngestIngestResponses];
-
-export type ApiV1UtilsHealthCheckHealthCheckData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/utils/health-check';
-};
-
-export type ApiV1UtilsHealthCheckHealthCheckResponses = {
-    /**
-     * Request fulfilled, document follows
-     */
-    200: boolean;
-};
-
-export type ApiV1UtilsHealthCheckHealthCheckResponse = ApiV1UtilsHealthCheckHealthCheckResponses[keyof ApiV1UtilsHealthCheckHealthCheckResponses];
-
-export type ApiV1UtilsTestEmailTestEmailData = {
-    body: {
-        [key: string]: unknown;
-    } | null;
-    path?: never;
-    query?: {
-        email_to?: string | null;
-    };
-    url: '/api/v1/utils/test-email';
-};
-
-export type ApiV1UtilsTestEmailTestEmailErrors = {
-    /**
-     * Validation Exception
-     */
-    400: {
-        status_code: number;
-        detail: string;
-        extra?: null | {
-            [key: string]: unknown;
-        } | Array<unknown>;
-    };
-};
-
-export type ApiV1UtilsTestEmailTestEmailError = ApiV1UtilsTestEmailTestEmailErrors[keyof ApiV1UtilsTestEmailTestEmailErrors];
-
-export type ApiV1UtilsTestEmailTestEmailResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: Message;
-};
-
-export type ApiV1UtilsTestEmailTestEmailResponse = ApiV1UtilsTestEmailTestEmailResponses[keyof ApiV1UtilsTestEmailTestEmailResponses];

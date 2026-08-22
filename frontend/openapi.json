@@ -1,162 +1,331 @@
 {
+  "components": {
+    "schemas": {
+      "Message": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "Message",
+        "type": "object"
+      },
+      "TelemetryRecord": {
+        "properties": {
+          "current_a": {
+            "type": "number"
+          },
+          "frequency_hz": {
+            "type": "number"
+          },
+          "power_factor": {
+            "type": "number"
+          },
+          "timestamp_epoch": {
+            "type": "number"
+          },
+          "transformer_id": {
+            "type": "string"
+          },
+          "voltage_v": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "current_a",
+          "frequency_hz",
+          "power_factor",
+          "timestamp_epoch",
+          "transformer_id",
+          "voltage_v"
+        ],
+        "title": "TelemetryRecord",
+        "type": "object"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "default": 3600,
+            "type": "integer"
+          },
+          "token_type": {
+            "default": "bearer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+      },
+      "UpdatePassword": {
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "UpdatePassword",
+        "type": "object"
+      },
+      "UserAdminCreate": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "is_active": {
+            "default": true,
+            "type": "boolean"
+          },
+          "is_superuser": {
+            "default": false,
+            "type": "boolean"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "full_name",
+          "password"
+        ],
+        "title": "UserAdminCreate",
+        "type": "object"
+      },
+      "UserAdminUpdate": {
+        "properties": {
+          "email": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "full_name": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_active": {
+            "oneOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_superuser": {
+            "oneOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "password": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "title": "UserAdminUpdate",
+        "type": "object"
+      },
+      "UserCreate": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "full_name",
+          "password"
+        ],
+        "title": "UserCreate",
+        "type": "object"
+      },
+      "UserRead": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "is_superuser": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "email",
+          "full_name",
+          "id",
+          "is_active",
+          "is_superuser"
+        ],
+        "title": "UserRead",
+        "type": "object"
+      },
+      "UserUpdateMe": {
+        "properties": {
+          "email": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "full_name": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "password": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "title": "UserUpdateMe",
+        "type": "object"
+      },
+      "UsersPublic": {
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UserRead"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "count",
+          "data"
+        ],
+        "title": "UsersPublic",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "Enter JWT Bearer token directly: Bearer <token>",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "OAuth2Password": {
+        "description": "Standard Swagger / Scalar OAuth2 username & password login",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/api/v1/auth/login"
+          }
+        },
+        "type": "oauth2"
+      }
+    }
+  },
   "info": {
+    "description": "Enterprise Platform API with OAuth2 Password flow, Bearer JWT authorization, and RBAC control.",
     "title": "Enterprise Platform API",
-    "version": "1.0.0",
-    "description": "Enterprise Platform API with OAuth2 Password flow, Bearer JWT authorization, and RBAC control."
+    "version": "1.0.0"
   },
   "openapi": "3.1.0",
-  "servers": [
-    {
-      "url": "/"
-    }
-  ],
   "paths": {
-    "/health": {
-      "get": {
-        "summary": "Basic Health Status",
-        "description": "Returns standard healthy indicator.",
-        "operationId": "HealthGetHealth",
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/health/live": {
-      "get": {
-        "summary": "Liveness Probe",
-        "description": "Kubernetes liveness check: immediate 200 if ASGI event loop is active.",
-        "operationId": "HealthLiveGetLiveness",
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/health/ready": {
-      "get": {
-        "summary": "Readiness Probe",
-        "description": "Deep dependency health check: verifies PostgreSQL and Valkey connectivity.",
-        "operationId": "HealthReadyGetReadiness",
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {},
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/health/startup": {
-      "get": {
-        "summary": "Startup Probe",
-        "description": "Validates that database migrations are executed and operational.",
-        "operationId": "HealthStartupGetStartup",
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {},
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/metrics": {
-      "get": {
-        "tags": [
-          "ops"
-        ],
-        "summary": "Prometheus Metrics",
-        "description": "Prometheus scrapable text exposition metric stream.",
-        "operationId": "MetricsMetricsEndpoint",
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "text/plain; version=1.0.0; charset=utf-8": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
     "/api/v1/auth/login": {
       "post": {
-        "summary": "Obtain bearer token",
+        "deprecated": false,
         "description": "Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.",
         "operationId": "ApiV1AuthLoginLogin",
         "responses": {
           "201": {
-            "description": "Document created, URL follows",
-            "headers": {},
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TokenResponse"
                 }
               }
-            }
+            },
+            "description": "Document created, URL follows",
+            "headers": {}
           }
         },
-        "deprecated": false
+        "summary": "Obtain bearer token"
       }
     },
     "/api/v1/auth/logout": {
       "post": {
-        "summary": "Revoke bearer token",
+        "deprecated": false,
         "description": "Revoke the calling bearer token and invalidate in cache store.",
         "operationId": "ApiV1AuthLogoutLogout",
         "responses": {
           "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
             "content": {
               "application/json": {
                 "schema": {
@@ -166,802 +335,38 @@
                   "type": "object"
                 }
               }
-            }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
           }
         },
-        "deprecated": false
+        "summary": "Revoke bearer token"
       }
     },
     "/api/v1/auth/token": {
       "post": {
-        "summary": "OAuth2 Token Endpoint",
+        "deprecated": false,
         "description": "RFC 6749 standard OAuth2 /token endpoint for Swagger UI & automated tools.",
         "operationId": "ApiV1AuthTokenToken",
         "responses": {
           "201": {
-            "description": "Document created, URL follows",
-            "headers": {},
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TokenResponse"
                 }
               }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/api/v1/users": {
-      "get": {
-        "summary": "List users (Admin)",
-        "description": "Superadmin endpoint to list all platform user records.",
-        "operationId": "ApiV1UsersListUsers",
-        "parameters": [
-          {
-            "name": "skip",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 0
             },
-            "required": false,
-            "deprecated": false,
-            "allowEmptyValue": false,
-            "allowReserved": false
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 100
-            },
-            "required": false,
-            "deprecated": false,
-            "allowEmptyValue": false,
-            "allowReserved": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UsersPublic"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      },
-      "post": {
-        "summary": "Provision user (Admin)",
-        "description": "Superadmin endpoint to create a user with custom roles and superuser status.",
-        "operationId": "ApiV1UsersCreateUserAdmin",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserAdminCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
             "description": "Document created, URL follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
+            "headers": {}
           }
         },
-        "deprecated": false
-      }
-    },
-    "/api/v1/users/me": {
-      "get": {
-        "summary": "Get own profile",
-        "description": "Returns the profile of the currently authenticated user.",
-        "operationId": "ApiV1UsersMeGetMe",
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      },
-      "delete": {
-        "summary": "Delete own account",
-        "description": "Standard users can delete their own account. Superusers are forbidden.",
-        "operationId": "ApiV1UsersMeDeleteMe",
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Message"
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      },
-      "patch": {
-        "summary": "Update own profile",
-        "description": "Update the authenticated user's full_name, email, or password.",
-        "operationId": "ApiV1UsersMeUpdateMe",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserUpdateMe"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/api/v1/users/{user_id}": {
-      "get": {
-        "summary": "Get user details (Admin)",
-        "description": "Retrieve details of a user by UUID.",
-        "operationId": "ApiV1UsersUserIdGetUserById",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "deprecated": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      },
-      "delete": {
-        "summary": "Delete user (Admin)",
-        "description": "Superadmin endpoint to permanently remove a user account.",
-        "operationId": "ApiV1UsersUserIdDeleteUser",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "deprecated": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Message"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      },
-      "patch": {
-        "summary": "Update user details (Admin)",
-        "description": "Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
-        "operationId": "ApiV1UsersUserIdUpdateUserAdmin",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "deprecated": false
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserAdminUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/api/v1/users/register": {
-      "post": {
-        "summary": "Open user registration",
-        "description": "Create a new standard (non-superuser) account. No JWT required.",
-        "operationId": "ApiV1UsersRegisterRegister",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Document created, URL follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/api/v1/users/signup": {
-      "post": {
-        "summary": "Open user signup",
-        "description": "Create a new standard (non-superuser) account. No JWT required.",
-        "operationId": "ApiV1UsersSignupSignup",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Document created, URL follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/api/v1/users/me/password": {
-      "patch": {
-        "summary": "Update own password",
-        "description": "Change password for the currently authenticated user.",
-        "operationId": "ApiV1UsersMePasswordUpdatePasswordMe",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePassword"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Message"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    },
-    "/api/v1/users/{user_id}/role": {
-      "patch": {
-        "summary": "Update user role/status (Admin)",
-        "description": "Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
-        "operationId": "ApiV1UsersUserIdRoleUpdateUserRoleAdmin",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "deprecated": false
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserAdminUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRead"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request syntax or unsupported method",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "extra": {
-                      "additionalProperties": {},
-                      "type": [
-                        "null",
-                        "object",
-                        "array"
-                      ]
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "detail",
-                    "status_code"
-                  ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "deprecated": false
+        "summary": "OAuth2 Token Endpoint"
       }
     },
     "/api/v1/telemetry/ingest": {
       "post": {
-        "summary": "Bulk telemetry ingestion",
+        "deprecated": false,
         "description": "Accepts a list of TelemetryRecord objects. Records are bulk-inserted to PostgreSQL and the latest reading per unique transformer_id is written to Valkey.",
         "operationId": "ApiV1TelemetryIngestIngest",
         "requestBody": {
@@ -979,25 +384,29 @@
         },
         "responses": {
           "202": {
-            "description": "Request accepted, processing continues off-line",
-            "headers": {},
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object"
                 }
               }
-            }
+            },
+            "description": "Request accepted, processing continues off-line",
+            "headers": {}
           },
           "400": {
-            "description": "Bad request syntax or unsupported method",
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
                   "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
                     "detail": {
                       "type": "string"
                     },
@@ -1008,59 +417,825 @@
                         "object",
                         "array"
                       ]
+                    },
+                    "status_code": {
+                      "type": "integer"
                     }
                   },
-                  "type": "object",
                   "required": [
                     "detail",
                     "status_code"
                   ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Bulk telemetry ingestion"
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "deprecated": false,
+        "description": "Superadmin endpoint to list all platform user records.",
+        "operationId": "ApiV1UsersListUsers",
+        "parameters": [
+          {
+            "allowEmptyValue": false,
+            "allowReserved": false,
+            "deprecated": false,
+            "in": "query",
+            "name": "skip",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "allowEmptyValue": false,
+            "allowReserved": false,
+            "deprecated": false,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsersPublic"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
                   "description": "Validation Exception",
                   "examples": [
                     {
-                      "status_code": 400,
                       "detail": "Bad Request",
-                      "extra": {}
+                      "extra": {},
+                      "status_code": 400
                     }
-                  ]
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
                 }
               }
-            }
+            },
+            "description": "Bad request syntax or unsupported method"
           }
         },
-        "deprecated": false
+        "summary": "List users (Admin)"
+      },
+      "post": {
+        "deprecated": false,
+        "description": "Superadmin endpoint to create a user with custom roles and superuser status.",
+        "operationId": "ApiV1UsersCreateUserAdmin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAdminCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Document created, URL follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Provision user (Admin)"
+      }
+    },
+    "/api/v1/users/me": {
+      "delete": {
+        "deprecated": false,
+        "description": "Standard users can delete their own account. Superusers are forbidden.",
+        "operationId": "ApiV1UsersMeDeleteMe",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          }
+        },
+        "summary": "Delete own account"
+      },
+      "get": {
+        "deprecated": false,
+        "description": "Returns the profile of the currently authenticated user.",
+        "operationId": "ApiV1UsersMeGetMe",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          }
+        },
+        "summary": "Get own profile"
+      },
+      "patch": {
+        "deprecated": false,
+        "description": "Update the authenticated user's full_name, email, or password.",
+        "operationId": "ApiV1UsersMeUpdateMe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateMe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Update own profile"
+      }
+    },
+    "/api/v1/users/me/password": {
+      "patch": {
+        "deprecated": false,
+        "description": "Change password for the currently authenticated user.",
+        "operationId": "ApiV1UsersMePasswordUpdatePasswordMe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Update own password"
+      }
+    },
+    "/api/v1/users/register": {
+      "post": {
+        "deprecated": false,
+        "description": "Create a new standard (non-superuser) account. No JWT required.",
+        "operationId": "ApiV1UsersRegisterRegister",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Document created, URL follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Open user registration"
+      }
+    },
+    "/api/v1/users/signup": {
+      "post": {
+        "deprecated": false,
+        "description": "Create a new standard (non-superuser) account. No JWT required.",
+        "operationId": "ApiV1UsersSignupSignup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Document created, URL follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Open user signup"
+      }
+    },
+    "/api/v1/users/{user_id}": {
+      "delete": {
+        "deprecated": false,
+        "description": "Superadmin endpoint to permanently remove a user account.",
+        "operationId": "ApiV1UsersUserIdDeleteUser",
+        "parameters": [
+          {
+            "deprecated": false,
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Delete user (Admin)"
+      },
+      "get": {
+        "deprecated": false,
+        "description": "Retrieve details of a user by UUID.",
+        "operationId": "ApiV1UsersUserIdGetUserById",
+        "parameters": [
+          {
+            "deprecated": false,
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Get user details (Admin)"
+      },
+      "patch": {
+        "deprecated": false,
+        "description": "Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
+        "operationId": "ApiV1UsersUserIdUpdateUserAdmin",
+        "parameters": [
+          {
+            "deprecated": false,
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAdminUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Update user details (Admin)"
+      }
+    },
+    "/api/v1/users/{user_id}/role": {
+      "patch": {
+        "deprecated": false,
+        "description": "Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
+        "operationId": "ApiV1UsersUserIdRoleUpdateUserRoleAdmin",
+        "parameters": [
+          {
+            "deprecated": false,
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAdminUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRead"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    },
+                    "extra": {
+                      "additionalProperties": {},
+                      "type": [
+                        "null",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "detail",
+                    "status_code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad request syntax or unsupported method"
+          }
+        },
+        "summary": "Update user role/status (Admin)"
       }
     },
     "/api/v1/utils/health-check": {
       "get": {
-        "summary": "Basic health check",
+        "deprecated": false,
         "description": "Lightweight ping endpoint.",
         "operationId": "ApiV1UtilsHealthCheckHealthCheck",
         "responses": {
           "200": {
-            "description": "Request fulfilled, document follows",
-            "headers": {},
             "content": {
               "application/json": {
                 "schema": {
                   "type": "boolean"
                 }
               }
-            }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
           }
         },
-        "deprecated": false
+        "summary": "Basic health check"
       }
     },
     "/api/v1/utils/test-email": {
       "post": {
-        "summary": "Test email delivery",
+        "deprecated": false,
         "description": "Dispatch a test transaction email to verify SMTP configuration.",
         "operationId": "ApiV1UtilsTestEmailTestEmail",
         "parameters": [
           {
-            "name": "email_to",
+            "allowEmptyValue": false,
+            "allowReserved": false,
+            "deprecated": false,
             "in": "query",
+            "name": "email_to",
+            "required": false,
             "schema": {
               "oneOf": [
                 {
@@ -1070,11 +1245,7 @@
                   "type": "null"
                 }
               ]
-            },
-            "required": false,
-            "deprecated": false,
-            "allowEmptyValue": false,
-            "allowReserved": false
+            }
           }
         ],
         "requestBody": {
@@ -1097,25 +1268,29 @@
         },
         "responses": {
           "201": {
-            "description": "Document created, URL follows",
-            "headers": {},
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Message"
                 }
               }
-            }
+            },
+            "description": "Document created, URL follows",
+            "headers": {}
           },
           "400": {
-            "description": "Bad request syntax or unsupported method",
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Validation Exception",
+                  "examples": [
+                    {
+                      "detail": "Bad Request",
+                      "extra": {},
+                      "status_code": 400
+                    }
+                  ],
                   "properties": {
-                    "status_code": {
-                      "type": "integer"
-                    },
                     "detail": {
                       "type": "string"
                     },
@@ -1126,319 +1301,139 @@
                         "object",
                         "array"
                       ]
+                    },
+                    "status_code": {
+                      "type": "integer"
                     }
                   },
-                  "type": "object",
                   "required": [
                     "detail",
                     "status_code"
                   ],
-                  "description": "Validation Exception",
-                  "examples": [
-                    {
-                      "status_code": 400,
-                      "detail": "Bad Request",
-                      "extra": {}
-                    }
-                  ]
+                  "type": "object"
                 }
               }
-            }
-          }
-        },
-        "deprecated": false
-      }
-    }
-  },
-  "components": {
-    "schemas": {
-      "Message": {
-        "properties": {
-          "message": {
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "Message"
-      },
-      "TelemetryRecord": {
-        "properties": {
-          "transformer_id": {
-            "type": "string"
-          },
-          "voltage_v": {
-            "type": "number"
-          },
-          "current_a": {
-            "type": "number"
-          },
-          "power_factor": {
-            "type": "number"
-          },
-          "frequency_hz": {
-            "type": "number"
-          },
-          "timestamp_epoch": {
-            "type": "number"
-          }
-        },
-        "type": "object",
-        "required": [
-          "current_a",
-          "frequency_hz",
-          "power_factor",
-          "timestamp_epoch",
-          "transformer_id",
-          "voltage_v"
-        ],
-        "title": "TelemetryRecord"
-      },
-      "TokenResponse": {
-        "properties": {
-          "access_token": {
-            "type": "string"
-          },
-          "token_type": {
-            "type": "string",
-            "default": "bearer"
-          },
-          "expires_in": {
-            "type": "integer",
-            "default": 3600
-          }
-        },
-        "type": "object",
-        "required": [
-          "access_token"
-        ],
-        "title": "TokenResponse"
-      },
-      "UpdatePassword": {
-        "properties": {
-          "current_password": {
-            "type": "string"
-          },
-          "new_password": {
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "required": [
-          "current_password",
-          "new_password"
-        ],
-        "title": "UpdatePassword"
-      },
-      "UserAdminCreate": {
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          },
-          "full_name": {
-            "type": "string"
-          },
-          "is_active": {
-            "type": "boolean",
-            "default": true
-          },
-          "is_superuser": {
-            "type": "boolean",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "email",
-          "full_name",
-          "password"
-        ],
-        "title": "UserAdminCreate"
-      },
-      "UserAdminUpdate": {
-        "properties": {
-          "full_name": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "email": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "password": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "is_active": {
-            "oneOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "is_superuser": {
-            "oneOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [],
-        "title": "UserAdminUpdate"
-      },
-      "UserCreate": {
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          },
-          "full_name": {
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "required": [
-          "email",
-          "full_name",
-          "password"
-        ],
-        "title": "UserCreate"
-      },
-      "UserRead": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "email": {
-            "type": "string"
-          },
-          "full_name": {
-            "type": "string"
-          },
-          "is_active": {
-            "type": "boolean"
-          },
-          "is_superuser": {
-            "type": "boolean"
-          }
-        },
-        "type": "object",
-        "required": [
-          "email",
-          "full_name",
-          "id",
-          "is_active",
-          "is_superuser"
-        ],
-        "title": "UserRead"
-      },
-      "UserUpdateMe": {
-        "properties": {
-          "full_name": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "email": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "password": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [],
-        "title": "UserUpdateMe"
-      },
-      "UsersPublic": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/UserRead"
             },
-            "type": "array"
-          },
-          "count": {
-            "type": "integer"
+            "description": "Bad request syntax or unsupported method"
           }
         },
-        "type": "object",
-        "required": [
-          "count",
-          "data"
-        ],
-        "title": "UsersPublic"
+        "summary": "Test email delivery"
       }
     },
-    "securitySchemes": {
-      "BearerAuth": {
-        "type": "http",
-        "description": "Enter JWT Bearer token directly: Bearer <token>",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      },
-      "OAuth2Password": {
-        "type": "oauth2",
-        "description": "Standard Swagger / Scalar OAuth2 username & password login",
-        "flows": {
-          "password": {
-            "tokenUrl": "/api/v1/auth/login",
-            "scopes": {}
+    "/health": {
+      "get": {
+        "deprecated": false,
+        "description": "Returns standard healthy indicator.",
+        "operationId": "HealthGetHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
           }
-        }
+        },
+        "summary": "Basic Health Status"
+      }
+    },
+    "/health/live": {
+      "get": {
+        "deprecated": false,
+        "description": "Kubernetes liveness check: immediate 200 if ASGI event loop is active.",
+        "operationId": "HealthLiveGetLiveness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          }
+        },
+        "summary": "Liveness Probe"
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "deprecated": false,
+        "description": "Deep dependency health check: verifies PostgreSQL and Valkey connectivity.",
+        "operationId": "HealthReadyGetReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          }
+        },
+        "summary": "Readiness Probe"
+      }
+    },
+    "/health/startup": {
+      "get": {
+        "deprecated": false,
+        "description": "Validates that database migrations are executed and operational.",
+        "operationId": "HealthStartupGetStartup",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          }
+        },
+        "summary": "Startup Probe"
+      }
+    },
+    "/metrics": {
+      "get": {
+        "deprecated": false,
+        "description": "Prometheus scrapable text exposition metric stream.",
+        "operationId": "MetricsMetricsEndpoint",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain; version=1.0.0; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Request fulfilled, document follows",
+            "headers": {}
+          }
+        },
+        "summary": "Prometheus Metrics",
+        "tags": [
+          "ops"
+        ]
       }
     }
   },
@@ -1448,6 +1443,11 @@
     },
     {
       "OAuth2Password": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "/"
     }
   ]
 }

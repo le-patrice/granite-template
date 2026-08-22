@@ -247,7 +247,7 @@ jobs:
         run: npx @hey-api/openapi-ts
 
       - name: Assert No Uncommitted Schema Drift
-        run: git diff --exit-code frontend/src/client
+        run: git diff --exit-code frontend/src/client frontend/openapi.json
 
   # ═══════════════════════════════════════════════════════════════════════════
   # JOB 5: Container Image Build Verification

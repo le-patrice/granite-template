@@ -319,7 +319,7 @@ db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups
 .PHONY: export-schema
 export-schema: ## Export Litestar OpenAPI 3.1 schema to frontend/openapi.json
 	@echo -e "$(YELLOW)Extracting OpenAPI schema...$(NC)"
-	@$(EXEC_APP) python -c "from app.main import app; import json; print(json.dumps(app.openapi_schema.to_schema(), indent=2))" > frontend/openapi.json
+	@$(EXEC_APP) python -c "from app.main import app; import json; print(json.dumps(app.openapi_schema.to_schema(), indent=2, sort_keys=True))" > frontend/openapi.json
 	@echo -e "$(GREEN)✅ Exported to frontend/openapi.json$(NC)"
 
 .PHONY: frontend-sync
@@ -330,6 +330,20 @@ frontend-sync: export-schema ## Compile TypeScript fetch client from exported Op
 		echo -e "$(GREEN)✅ Frontend API bindings updated in frontend/src/client/$(NC)"; \
 	else \
 		echo -e "$(YELLOW)Frontend directory not present. Skipping TypeScript generation.$(NC)"; \
+	fi
+
+.PHONY: check-client-drift
+check-client-drift: export-schema ## Validate zero drift between backend OpenAPI schema and frontend TypeScript client
+	@echo -e "$(BLUE)Validating zero client SDK schema drift...$(NC)"
+	@if [ -d "frontend" ]; then \
+		$(EXEC_FRONTEND) npm run generate-client 2>/dev/null || (cd frontend && npm run generate-client); \
+		if ! git diff --exit-code frontend/src/client frontend/openapi.json > /dev/null 2>&1; then \
+			echo -e "$(RED)❌ ERROR: Frontend SDK schema drift detected!$(NC)"; \
+			echo -e "$(YELLOW)Run 'make frontend-sync' and commit the updated client bindings.$(NC)"; \
+			git diff frontend/src/client frontend/openapi.json; \
+			exit 1; \
+		fi; \
+		echo -e "$(GREEN)✅ Zero SDK drift verified. Client bindings match backend OpenAPI schema exactly.$(NC)"; \
 	fi
 
 .PHONY: frontend-build

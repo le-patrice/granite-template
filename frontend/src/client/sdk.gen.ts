@@ -19,101 +19,6 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
- * Basic Health Status
- *
- * Returns standard healthy indicator.
- */
-export const healthGetHealth = <ThrowOnError extends boolean = false>(options?: Options<HealthGetHealthData, ThrowOnError>): RequestResult<HealthGetHealthResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthGetHealthResponses, unknown, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/health',
-    ...options
-});
-
-/**
- * Liveness Probe
- *
- * Kubernetes liveness check: immediate 200 if ASGI event loop is active.
- */
-export const healthLiveGetLiveness = <ThrowOnError extends boolean = false>(options?: Options<HealthLiveGetLivenessData, ThrowOnError>): RequestResult<HealthLiveGetLivenessResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthLiveGetLivenessResponses, unknown, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/health/live',
-    ...options
-});
-
-/**
- * Readiness Probe
- *
- * Deep dependency health check: verifies PostgreSQL and Valkey connectivity.
- */
-export const healthReadyGetReadiness = <ThrowOnError extends boolean = false>(options?: Options<HealthReadyGetReadinessData, ThrowOnError>): RequestResult<HealthReadyGetReadinessResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthReadyGetReadinessResponses, unknown, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/health/ready',
-    ...options
-});
-
-/**
- * Startup Probe
- *
- * Validates that database migrations are executed and operational.
- */
-export const healthStartupGetStartup = <ThrowOnError extends boolean = false>(options?: Options<HealthStartupGetStartupData, ThrowOnError>): RequestResult<HealthStartupGetStartupResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthStartupGetStartupResponses, unknown, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/health/startup',
-    ...options
-});
-
-/**
- * Prometheus Metrics
- *
- * Prometheus scrapable text exposition metric stream.
- */
-export const metricsMetricsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<MetricsMetricsEndpointData, ThrowOnError>): RequestResult<MetricsMetricsEndpointResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MetricsMetricsEndpointResponses, unknown, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/metrics',
-    ...options
-});
-
-/**
  * Obtain bearer token
  *
  * Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.
@@ -168,6 +73,29 @@ export const apiV1AuthTokenToken = <ThrowOnError extends boolean = false>(option
         }],
     url: '/api/v1/auth/token',
     ...options
+});
+
+/**
+ * Bulk telemetry ingestion
+ *
+ * Accepts a list of TelemetryRecord objects. Records are bulk-inserted to PostgreSQL and the latest reading per unique transformer_id is written to Valkey.
+ */
+export const apiV1TelemetryIngestIngest = <ThrowOnError extends boolean = false>(options: Options<ApiV1TelemetryIngestIngestData, ThrowOnError>): RequestResult<ApiV1TelemetryIngestIngestResponses, ApiV1TelemetryIngestIngestErrors, ThrowOnError> => (options.client ?? client).post<ApiV1TelemetryIngestIngestResponses, ApiV1TelemetryIngestIngestErrors, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/api/v1/telemetry/ingest',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -274,6 +202,75 @@ export const apiV1UsersMeUpdateMe = <ThrowOnError extends boolean = false>(optio
 });
 
 /**
+ * Update own password
+ *
+ * Change password for the currently authenticated user.
+ */
+export const apiV1UsersMePasswordUpdatePasswordMe = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersMePasswordUpdatePasswordMeData, ThrowOnError>): RequestResult<ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMePasswordUpdatePasswordMeErrors, ThrowOnError> => (options.client ?? client).patch<ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMePasswordUpdatePasswordMeErrors, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/api/v1/users/me/password',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Open user registration
+ *
+ * Create a new standard (non-superuser) account. No JWT required.
+ */
+export const apiV1UsersRegisterRegister = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersRegisterRegisterData, ThrowOnError>): RequestResult<ApiV1UsersRegisterRegisterResponses, ApiV1UsersRegisterRegisterErrors, ThrowOnError> => (options.client ?? client).post<ApiV1UsersRegisterRegisterResponses, ApiV1UsersRegisterRegisterErrors, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/api/v1/users/register',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Open user signup
+ *
+ * Create a new standard (non-superuser) account. No JWT required.
+ */
+export const apiV1UsersSignupSignup = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersSignupSignupData, ThrowOnError>): RequestResult<ApiV1UsersSignupSignupResponses, ApiV1UsersSignupSignupErrors, ThrowOnError> => (options.client ?? client).post<ApiV1UsersSignupSignupResponses, ApiV1UsersSignupSignupErrors, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/api/v1/users/signup',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * Delete user (Admin)
  *
  * Superadmin endpoint to permanently remove a user account.
@@ -335,75 +332,6 @@ export const apiV1UsersUserIdUpdateUserAdmin = <ThrowOnError extends boolean = f
 });
 
 /**
- * Open user registration
- *
- * Create a new standard (non-superuser) account. No JWT required.
- */
-export const apiV1UsersRegisterRegister = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersRegisterRegisterData, ThrowOnError>): RequestResult<ApiV1UsersRegisterRegisterResponses, ApiV1UsersRegisterRegisterErrors, ThrowOnError> => (options.client ?? client).post<ApiV1UsersRegisterRegisterResponses, ApiV1UsersRegisterRegisterErrors, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/api/v1/users/register',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Open user signup
- *
- * Create a new standard (non-superuser) account. No JWT required.
- */
-export const apiV1UsersSignupSignup = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersSignupSignupData, ThrowOnError>): RequestResult<ApiV1UsersSignupSignupResponses, ApiV1UsersSignupSignupErrors, ThrowOnError> => (options.client ?? client).post<ApiV1UsersSignupSignupResponses, ApiV1UsersSignupSignupErrors, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/api/v1/users/signup',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Update own password
- *
- * Change password for the currently authenticated user.
- */
-export const apiV1UsersMePasswordUpdatePasswordMe = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersMePasswordUpdatePasswordMeData, ThrowOnError>): RequestResult<ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMePasswordUpdatePasswordMeErrors, ThrowOnError> => (options.client ?? client).patch<ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMePasswordUpdatePasswordMeErrors, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/api/v1/users/me/password',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
  * Update user role/status (Admin)
  *
  * Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.
@@ -419,29 +347,6 @@ export const apiV1UsersUserIdRoleUpdateUserRoleAdmin = <ThrowOnError extends boo
             type: 'http'
         }],
     url: '/api/v1/users/{user_id}/role',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Bulk telemetry ingestion
- *
- * Accepts a list of TelemetryRecord objects. Records are bulk-inserted to PostgreSQL and the latest reading per unique transformer_id is written to Valkey.
- */
-export const apiV1TelemetryIngestIngest = <ThrowOnError extends boolean = false>(options: Options<ApiV1TelemetryIngestIngestData, ThrowOnError>): RequestResult<ApiV1TelemetryIngestIngestResponses, ApiV1TelemetryIngestIngestErrors, ThrowOnError> => (options.client ?? client).post<ApiV1TelemetryIngestIngestResponses, ApiV1TelemetryIngestIngestErrors, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/api/v1/telemetry/ingest',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -489,4 +394,99 @@ export const apiV1UtilsTestEmailTestEmail = <ThrowOnError extends boolean = fals
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Basic Health Status
+ *
+ * Returns standard healthy indicator.
+ */
+export const healthGetHealth = <ThrowOnError extends boolean = false>(options?: Options<HealthGetHealthData, ThrowOnError>): RequestResult<HealthGetHealthResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthGetHealthResponses, unknown, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/health',
+    ...options
+});
+
+/**
+ * Liveness Probe
+ *
+ * Kubernetes liveness check: immediate 200 if ASGI event loop is active.
+ */
+export const healthLiveGetLiveness = <ThrowOnError extends boolean = false>(options?: Options<HealthLiveGetLivenessData, ThrowOnError>): RequestResult<HealthLiveGetLivenessResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthLiveGetLivenessResponses, unknown, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/health/live',
+    ...options
+});
+
+/**
+ * Readiness Probe
+ *
+ * Deep dependency health check: verifies PostgreSQL and Valkey connectivity.
+ */
+export const healthReadyGetReadiness = <ThrowOnError extends boolean = false>(options?: Options<HealthReadyGetReadinessData, ThrowOnError>): RequestResult<HealthReadyGetReadinessResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthReadyGetReadinessResponses, unknown, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/health/ready',
+    ...options
+});
+
+/**
+ * Startup Probe
+ *
+ * Validates that database migrations are executed and operational.
+ */
+export const healthStartupGetStartup = <ThrowOnError extends boolean = false>(options?: Options<HealthStartupGetStartupData, ThrowOnError>): RequestResult<HealthStartupGetStartupResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthStartupGetStartupResponses, unknown, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/health/startup',
+    ...options
+});
+
+/**
+ * Prometheus Metrics
+ *
+ * Prometheus scrapable text exposition metric stream.
+ */
+export const metricsMetricsEndpoint = <ThrowOnError extends boolean = false>(options?: Options<MetricsMetricsEndpointData, ThrowOnError>): RequestResult<MetricsMetricsEndpointResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MetricsMetricsEndpointResponses, unknown, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/metrics',
+    ...options
 });

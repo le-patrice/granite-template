@@ -925,6 +925,8 @@ These rules are enforced by code review and CI — violations block merge:
 | **8** | `except Exception` always includes `# noqa: BLE001` or catches specific exception type | Ruff `BLE001` — blind exception catching must be intentional |
 | **9** | Background tasks use the correct tool per the [Async Execution Matrix](#3-asynchronous-execution-matrix) | Ensures reliability, retryability, and auditability proportional to business impact |
 | **10** | `make frontend-sync` is run and the diff committed after any endpoint change | Prevents schema drift detected by the CI `schema-drift` job |
+| **11** | Route handlers must NEVER bind multiple paths in a decorator (e.g. `path=["/a", "/b"]`) | Enforces deterministic OpenAPI operation IDs and prevents `@hey-api/openapi-ts` SDK drift. Use separate explicit handler methods instead (enforced by `test_no_multipath_route_decorators`). |
+| **12** | All OpenAPI schema exports must be canonicalized with deterministic key sorting (`sort_keys=True`) | Guarantees byte-for-byte repeatable SDK artifacts across local dev, containers, and CI. |
 
 ---
 
