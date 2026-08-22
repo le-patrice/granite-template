@@ -26,7 +26,7 @@ class HealthController(Controller):
     opt: ClassVar[dict[str, bool]] = {"exclude_from_auth": True}
 
     @get(
-        path=["", "/"],
+        path="",
         status_code=HTTP_200_OK,
         summary="Basic Health Status",
         description="Returns standard healthy indicator.",

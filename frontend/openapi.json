@@ -366,8 +366,8 @@
         "deprecated": false
       },
       "delete": {
-        "summary": "Delete own user",
-        "description": "Delete current user account. Superusers cannot delete themselves.",
+        "summary": "Delete own account",
+        "description": "Standard users can delete their own account. Superusers are forbidden.",
         "operationId": "ApiV1UsersMeDeleteMe",
         "responses": {
           "200": {
@@ -386,7 +386,7 @@
       },
       "patch": {
         "summary": "Update own profile",
-        "description": "Update the authenticated user's full_name and/or email.",
+        "description": "Update the authenticated user's full_name, email, or password.",
         "operationId": "ApiV1UsersMeUpdateMe",
         "requestBody": {
           "content": {
@@ -592,7 +592,7 @@
         "deprecated": false
       },
       "patch": {
-        "summary": "Update user role/status (Admin)",
+        "summary": "Update user details (Admin)",
         "description": "Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
         "operationId": "ApiV1UsersUserIdUpdateUserAdmin",
         "parameters": [
@@ -742,9 +742,9 @@
     },
     "/api/v1/users/signup": {
       "post": {
-        "summary": "Open user registration",
+        "summary": "Open user signup",
         "description": "Create a new standard (non-superuser) account. No JWT required.",
-        "operationId": "ApiV1UsersSignupRegister",
+        "operationId": "ApiV1UsersSignupSignup",
         "requestBody": {
           "content": {
             "application/json": {
@@ -812,7 +812,7 @@
     "/api/v1/users/me/password": {
       "patch": {
         "summary": "Update own password",
-        "description": "Validate current password and set a new password.",
+        "description": "Change password for the currently authenticated user.",
         "operationId": "ApiV1UsersMePasswordUpdatePasswordMe",
         "requestBody": {
           "content": {
@@ -882,7 +882,7 @@
       "patch": {
         "summary": "Update user role/status (Admin)",
         "description": "Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
-        "operationId": "ApiV1UsersUserIdRoleUpdateUserAdmin",
+        "operationId": "ApiV1UsersUserIdRoleUpdateUserRoleAdmin",
         "parameters": [
           {
             "name": "user_id",

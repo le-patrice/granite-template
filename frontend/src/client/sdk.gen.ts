@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiV1AuthLoginLoginData, ApiV1AuthLoginLoginResponses, ApiV1AuthLogoutLogoutData, ApiV1AuthLogoutLogoutResponses, ApiV1AuthTokenTokenData, ApiV1AuthTokenTokenResponses, ApiV1TelemetryIngestIngestData, ApiV1TelemetryIngestIngestErrors, ApiV1TelemetryIngestIngestResponses, ApiV1UsersCreateUserAdminData, ApiV1UsersCreateUserAdminErrors, ApiV1UsersCreateUserAdminResponses, ApiV1UsersListUsersData, ApiV1UsersListUsersErrors, ApiV1UsersListUsersResponses, ApiV1UsersMeDeleteMeData, ApiV1UsersMeDeleteMeResponses, ApiV1UsersMeGetMeData, ApiV1UsersMeGetMeResponses, ApiV1UsersMePasswordUpdatePasswordMeData, ApiV1UsersMePasswordUpdatePasswordMeErrors, ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMeUpdateMeData, ApiV1UsersMeUpdateMeErrors, ApiV1UsersMeUpdateMeResponses, ApiV1UsersRegisterRegisterData, ApiV1UsersRegisterRegisterErrors, ApiV1UsersRegisterRegisterResponses, ApiV1UsersSignupRegisterData, ApiV1UsersSignupRegisterErrors, ApiV1UsersSignupRegisterResponses, ApiV1UsersUserIdDeleteUserData, ApiV1UsersUserIdDeleteUserErrors, ApiV1UsersUserIdDeleteUserResponses, ApiV1UsersUserIdGetUserByIdData, ApiV1UsersUserIdGetUserByIdErrors, ApiV1UsersUserIdGetUserByIdResponses, ApiV1UsersUserIdRoleUpdateUserAdminData, ApiV1UsersUserIdRoleUpdateUserAdminErrors, ApiV1UsersUserIdRoleUpdateUserAdminResponses, ApiV1UsersUserIdUpdateUserAdminData, ApiV1UsersUserIdUpdateUserAdminErrors, ApiV1UsersUserIdUpdateUserAdminResponses, ApiV1UtilsHealthCheckHealthCheckData, ApiV1UtilsHealthCheckHealthCheckResponses, ApiV1UtilsTestEmailTestEmailData, ApiV1UtilsTestEmailTestEmailErrors, ApiV1UtilsTestEmailTestEmailResponses, HealthGetHealthData, HealthGetHealthResponses, HealthLiveGetLivenessData, HealthLiveGetLivenessResponses, HealthReadyGetReadinessData, HealthReadyGetReadinessResponses, HealthStartupGetStartupData, HealthStartupGetStartupResponses, MetricsMetricsEndpointData, MetricsMetricsEndpointResponses } from './types.gen';
+import type { ApiV1AuthLoginLoginData, ApiV1AuthLoginLoginResponses, ApiV1AuthLogoutLogoutData, ApiV1AuthLogoutLogoutResponses, ApiV1AuthTokenTokenData, ApiV1AuthTokenTokenResponses, ApiV1TelemetryIngestIngestData, ApiV1TelemetryIngestIngestErrors, ApiV1TelemetryIngestIngestResponses, ApiV1UsersCreateUserAdminData, ApiV1UsersCreateUserAdminErrors, ApiV1UsersCreateUserAdminResponses, ApiV1UsersListUsersData, ApiV1UsersListUsersErrors, ApiV1UsersListUsersResponses, ApiV1UsersMeDeleteMeData, ApiV1UsersMeDeleteMeResponses, ApiV1UsersMeGetMeData, ApiV1UsersMeGetMeResponses, ApiV1UsersMePasswordUpdatePasswordMeData, ApiV1UsersMePasswordUpdatePasswordMeErrors, ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMeUpdateMeData, ApiV1UsersMeUpdateMeErrors, ApiV1UsersMeUpdateMeResponses, ApiV1UsersRegisterRegisterData, ApiV1UsersRegisterRegisterErrors, ApiV1UsersRegisterRegisterResponses, ApiV1UsersSignupSignupData, ApiV1UsersSignupSignupErrors, ApiV1UsersSignupSignupResponses, ApiV1UsersUserIdDeleteUserData, ApiV1UsersUserIdDeleteUserErrors, ApiV1UsersUserIdDeleteUserResponses, ApiV1UsersUserIdGetUserByIdData, ApiV1UsersUserIdGetUserByIdErrors, ApiV1UsersUserIdGetUserByIdResponses, ApiV1UsersUserIdRoleUpdateUserRoleAdminData, ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors, ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses, ApiV1UsersUserIdUpdateUserAdminData, ApiV1UsersUserIdUpdateUserAdminErrors, ApiV1UsersUserIdUpdateUserAdminResponses, ApiV1UtilsHealthCheckHealthCheckData, ApiV1UtilsHealthCheckHealthCheckResponses, ApiV1UtilsTestEmailTestEmailData, ApiV1UtilsTestEmailTestEmailErrors, ApiV1UtilsTestEmailTestEmailResponses, HealthGetHealthData, HealthGetHealthResponses, HealthLiveGetLivenessData, HealthLiveGetLivenessResponses, HealthReadyGetReadinessData, HealthReadyGetReadinessResponses, HealthStartupGetStartupData, HealthStartupGetStartupResponses, MetricsMetricsEndpointData, MetricsMetricsEndpointResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -213,9 +213,9 @@ export const apiV1UsersCreateUserAdmin = <ThrowOnError extends boolean = false>(
 });
 
 /**
- * Delete own user
+ * Delete own account
  *
- * Delete current user account. Superusers cannot delete themselves.
+ * Standard users can delete their own account. Superusers are forbidden.
  */
 export const apiV1UsersMeDeleteMe = <ThrowOnError extends boolean = false>(options?: Options<ApiV1UsersMeDeleteMeData, ThrowOnError>): RequestResult<ApiV1UsersMeDeleteMeResponses, unknown, ThrowOnError> => (options?.client ?? client).delete<ApiV1UsersMeDeleteMeResponses, unknown, ThrowOnError>({
     security: [{
@@ -253,7 +253,7 @@ export const apiV1UsersMeGetMe = <ThrowOnError extends boolean = false>(options?
 /**
  * Update own profile
  *
- * Update the authenticated user's full_name and/or email.
+ * Update the authenticated user's full_name, email, or password.
  */
 export const apiV1UsersMeUpdateMe = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersMeUpdateMeData, ThrowOnError>): RequestResult<ApiV1UsersMeUpdateMeResponses, ApiV1UsersMeUpdateMeErrors, ThrowOnError> => (options.client ?? client).patch<ApiV1UsersMeUpdateMeResponses, ApiV1UsersMeUpdateMeErrors, ThrowOnError>({
     security: [{
@@ -312,7 +312,7 @@ export const apiV1UsersUserIdGetUserById = <ThrowOnError extends boolean = false
 });
 
 /**
- * Update user role/status (Admin)
+ * Update user details (Admin)
  *
  * Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.
  */
@@ -358,11 +358,11 @@ export const apiV1UsersRegisterRegister = <ThrowOnError extends boolean = false>
 });
 
 /**
- * Open user registration
+ * Open user signup
  *
  * Create a new standard (non-superuser) account. No JWT required.
  */
-export const apiV1UsersSignupRegister = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersSignupRegisterData, ThrowOnError>): RequestResult<ApiV1UsersSignupRegisterResponses, ApiV1UsersSignupRegisterErrors, ThrowOnError> => (options.client ?? client).post<ApiV1UsersSignupRegisterResponses, ApiV1UsersSignupRegisterErrors, ThrowOnError>({
+export const apiV1UsersSignupSignup = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersSignupSignupData, ThrowOnError>): RequestResult<ApiV1UsersSignupSignupResponses, ApiV1UsersSignupSignupErrors, ThrowOnError> => (options.client ?? client).post<ApiV1UsersSignupSignupResponses, ApiV1UsersSignupSignupErrors, ThrowOnError>({
     security: [{
             key: 'BearerAuth',
             scheme: 'bearer',
@@ -383,7 +383,7 @@ export const apiV1UsersSignupRegister = <ThrowOnError extends boolean = false>(o
 /**
  * Update own password
  *
- * Validate current password and set a new password.
+ * Change password for the currently authenticated user.
  */
 export const apiV1UsersMePasswordUpdatePasswordMe = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersMePasswordUpdatePasswordMeData, ThrowOnError>): RequestResult<ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMePasswordUpdatePasswordMeErrors, ThrowOnError> => (options.client ?? client).patch<ApiV1UsersMePasswordUpdatePasswordMeResponses, ApiV1UsersMePasswordUpdatePasswordMeErrors, ThrowOnError>({
     security: [{
@@ -408,7 +408,7 @@ export const apiV1UsersMePasswordUpdatePasswordMe = <ThrowOnError extends boolea
  *
  * Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.
  */
-export const apiV1UsersUserIdRoleUpdateUserAdmin = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersUserIdRoleUpdateUserAdminData, ThrowOnError>): RequestResult<ApiV1UsersUserIdRoleUpdateUserAdminResponses, ApiV1UsersUserIdRoleUpdateUserAdminErrors, ThrowOnError> => (options.client ?? client).patch<ApiV1UsersUserIdRoleUpdateUserAdminResponses, ApiV1UsersUserIdRoleUpdateUserAdminErrors, ThrowOnError>({
+export const apiV1UsersUserIdRoleUpdateUserRoleAdmin = <ThrowOnError extends boolean = false>(options: Options<ApiV1UsersUserIdRoleUpdateUserRoleAdminData, ThrowOnError>): RequestResult<ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses, ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors, ThrowOnError> => (options.client ?? client).patch<ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses, ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors, ThrowOnError>({
     security: [{
             key: 'BearerAuth',
             scheme: 'bearer',

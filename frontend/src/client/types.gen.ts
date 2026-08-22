@@ -495,14 +495,14 @@ export type ApiV1UsersRegisterRegisterResponses = {
 
 export type ApiV1UsersRegisterRegisterResponse = ApiV1UsersRegisterRegisterResponses[keyof ApiV1UsersRegisterRegisterResponses];
 
-export type ApiV1UsersSignupRegisterData = {
+export type ApiV1UsersSignupSignupData = {
     body: UserCreate;
     path?: never;
     query?: never;
     url: '/api/v1/users/signup';
 };
 
-export type ApiV1UsersSignupRegisterErrors = {
+export type ApiV1UsersSignupSignupErrors = {
     /**
      * Validation Exception
      */
@@ -515,16 +515,16 @@ export type ApiV1UsersSignupRegisterErrors = {
     };
 };
 
-export type ApiV1UsersSignupRegisterError = ApiV1UsersSignupRegisterErrors[keyof ApiV1UsersSignupRegisterErrors];
+export type ApiV1UsersSignupSignupError = ApiV1UsersSignupSignupErrors[keyof ApiV1UsersSignupSignupErrors];
 
-export type ApiV1UsersSignupRegisterResponses = {
+export type ApiV1UsersSignupSignupResponses = {
     /**
      * Document created, URL follows
      */
     201: UserRead;
 };
 
-export type ApiV1UsersSignupRegisterResponse = ApiV1UsersSignupRegisterResponses[keyof ApiV1UsersSignupRegisterResponses];
+export type ApiV1UsersSignupSignupResponse = ApiV1UsersSignupSignupResponses[keyof ApiV1UsersSignupSignupResponses];
 
 export type ApiV1UsersMePasswordUpdatePasswordMeData = {
     body: UpdatePassword;
@@ -557,7 +557,7 @@ export type ApiV1UsersMePasswordUpdatePasswordMeResponses = {
 
 export type ApiV1UsersMePasswordUpdatePasswordMeResponse = ApiV1UsersMePasswordUpdatePasswordMeResponses[keyof ApiV1UsersMePasswordUpdatePasswordMeResponses];
 
-export type ApiV1UsersUserIdRoleUpdateUserAdminData = {
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminData = {
     body: UserAdminUpdate;
     path: {
         user_id: string;
@@ -566,7 +566,7 @@ export type ApiV1UsersUserIdRoleUpdateUserAdminData = {
     url: '/api/v1/users/{user_id}/role';
 };
 
-export type ApiV1UsersUserIdRoleUpdateUserAdminErrors = {
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors = {
     /**
      * Validation Exception
      */
@@ -579,16 +579,16 @@ export type ApiV1UsersUserIdRoleUpdateUserAdminErrors = {
     };
 };
 
-export type ApiV1UsersUserIdRoleUpdateUserAdminError = ApiV1UsersUserIdRoleUpdateUserAdminErrors[keyof ApiV1UsersUserIdRoleUpdateUserAdminErrors];
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminError = ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors[keyof ApiV1UsersUserIdRoleUpdateUserRoleAdminErrors];
 
-export type ApiV1UsersUserIdRoleUpdateUserAdminResponses = {
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses = {
     /**
      * Request fulfilled, document follows
      */
     200: UserRead;
 };
 
-export type ApiV1UsersUserIdRoleUpdateUserAdminResponse = ApiV1UsersUserIdRoleUpdateUserAdminResponses[keyof ApiV1UsersUserIdRoleUpdateUserAdminResponses];
+export type ApiV1UsersUserIdRoleUpdateUserRoleAdminResponse = ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses[keyof ApiV1UsersUserIdRoleUpdateUserRoleAdminResponses];
 
 export type ApiV1TelemetryIngestIngestData = {
     body: Array<TelemetryRecord>;

@@ -1,27 +1,18 @@
 """
-Users presentation controller with strict Role-Based Access Control (RBAC).
+Users management and administration controller.
 
-Ported 1:1 from reference implementation with async database repository.
-
-Endpoints
----------
-Public:
-  • POST  /api/v1/users/register        – Open self-registration
-  • POST  /api/v1/users/signup          – Signup alias
-
-Self Profile (JWT Required):
-  • GET   /api/v1/users/me              – Fetch own user profile
-  • PATCH /api/v1/users/me              – Update own profile (name, email)
-  • PATCH /api/v1/users/me/password     – Update own password
-  • DELETE /api/v1/users/me             – Delete own account
-
-Superadmin Management (SuperuserGuard Required):
-  • POST   /api/v1/users/               – Provision new user
-  • GET    /api/v1/users/               – List all registered users (paginated + count)
-  • GET    /api/v1/users/{user_id}      – Retrieve single user details
-  • PATCH  /api/v1/users/{user_id}      – Update user profile, roles, or active status
-  • PATCH  /api/v1/users/{user_id}/role – Assign/modify user privileges & roles
-  • DELETE /api/v1/users/{user_id}      – Delete user account
+Provides full parity with the reference FastAPI endpoints:
+  • POST /users/register & POST /users/signup  – Open self-registration (no JWT required)
+  • GET /users/me                             – Get current user profile
+  • PATCH /users/me                           – Update current user profile
+  • PATCH /users/me/password                  – Change current user password
+  • DELETE /users/me                          – Delete own account (standard users only)
+  • POST /users                               – Superadmin only: Provision new user with roles
+  • GET /users                                – Superadmin only: Paginated user list + count
+  • GET /users/{user_id}                      – Superadmin only: Retrieve user by ID
+  • PATCH /users/{user_id}                    – Superadmin only: Update user profile
+  • PATCH /users/{user_id}/role               – Superadmin only: Update user role / status
+  • DELETE /users/{user_id}                   – Superadmin only: Delete user
 """
 
 from __future__ import annotations
@@ -52,18 +43,9 @@ from app.domain.users.schemas import (
 )
 from app.presentation.guards.auth_guard import JWTAuthGuard, SuperuserGuard
 
-# ---------------------------------------------------------------------------
-# Dependency provider
-# ---------------------------------------------------------------------------
-
 
 async def provide_user_repo(db_session: AsyncSession) -> IUserRepository:
     return PostgresUserRepository(session=db_session)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _model_to_read(user: User) -> UserRead:
@@ -86,17 +68,7 @@ class UsersController(Controller):
     path = "/users"
     dependencies: ClassVar[dict[str, Provide]] = {"user_repo": Provide(provide_user_repo)}
 
-    # ------------------------------------------------------------------
-    # POST /register & /signup — open self-registration
-    # ------------------------------------------------------------------
-
-    @post(
-        path=["/register", "/signup"],
-        status_code=HTTP_201_CREATED,
-        summary="Open user registration",
-        description="Create a new standard (non-superuser) account. No JWT required.",
-    )
-    async def register(
+    async def _create_open_user(
         self,
         data: UserCreate,
         user_repo: IUserRepository,
@@ -117,6 +89,64 @@ class UsersController(Controller):
         )
         created = await user_repo.create(new_user)
         return _model_to_read(created)
+
+    async def _update_admin_user(
+        self,
+        user_id: uuid.UUID,
+        data: UserAdminUpdate,
+        user_repo: IUserRepository,
+    ) -> UserRead:
+        user = await user_repo.get_by_id(user_id)
+        if user is None:
+            raise NotFoundException(detail="User not found.")
+
+        if data.email and data.email != user.email:
+            existing = await user_repo.get_by_email(data.email)
+            if existing and existing.id != user_id:
+                raise ClientException(detail="User with this email already exists", status_code=409)
+            user.email = data.email
+
+        if data.full_name is not None:
+            user.full_name = data.full_name
+        if data.password is not None:
+            user.hashed_password = get_password_hash(data.password)
+        if data.is_active is not None:
+            user.is_active = data.is_active
+        if data.is_superuser is not None:
+            user.is_superuser = data.is_superuser
+
+        updated = await user_repo.update(user)
+        return _model_to_read(updated)
+
+    # ------------------------------------------------------------------
+    # POST /register & /signup — open self-registration
+    # ------------------------------------------------------------------
+
+    @post(
+        path="/register",
+        status_code=HTTP_201_CREATED,
+        summary="Open user registration",
+        description="Create a new standard (non-superuser) account. No JWT required.",
+    )
+    async def register(
+        self,
+        data: UserCreate,
+        user_repo: IUserRepository,
+    ) -> UserRead:
+        return await self._create_open_user(data, user_repo)
+
+    @post(
+        path="/signup",
+        status_code=HTTP_201_CREATED,
+        summary="Open user signup",
+        description="Create a new standard (non-superuser) account. No JWT required.",
+    )
+    async def signup(
+        self,
+        data: UserCreate,
+        user_repo: IUserRepository,
+    ) -> UserRead:
+        return await self._create_open_user(data, user_repo)
 
     # ------------------------------------------------------------------
     # GET /me — JWT required
@@ -151,7 +181,7 @@ class UsersController(Controller):
         guards=[JWTAuthGuard()],
         status_code=HTTP_200_OK,
         summary="Update own profile",
-        description="Update the authenticated user's full_name and/or email.",
+        description="Update the authenticated user's full_name, email, or password.",
     )
     async def update_me(
         self,
@@ -162,14 +192,13 @@ class UsersController(Controller):
         raw_id: str = request.scope.get("user_id", "")
         if not raw_id:
             raise NotFoundException(detail="User not found.")
-        current_id = uuid.UUID(raw_id)
-        user = await user_repo.get_by_id(current_id)
+        user = await user_repo.get_by_id(uuid.UUID(raw_id))
         if user is None:
             raise NotFoundException(detail="User not found.")
 
         if data.email and data.email != user.email:
             existing = await user_repo.get_by_email(data.email)
-            if existing and existing.id != current_id:
+            if existing and existing.id != user.id:
                 raise ClientException(detail="User with this email already exists", status_code=409)
             user.email = data.email
 
@@ -191,7 +220,7 @@ class UsersController(Controller):
         guards=[JWTAuthGuard()],
         status_code=HTTP_200_OK,
         summary="Update own password",
-        description="Validate current password and set a new password.",
+        description="Change password for the currently authenticated user.",
     )
     async def update_password_me(
         self,
@@ -206,12 +235,12 @@ class UsersController(Controller):
         if user is None:
             raise NotFoundException(detail="User not found.")
 
-        verified = await verify_password_async(data.current_password, user.hashed_password)
-        if not verified:
+        if not await verify_password_async(data.current_password, user.hashed_password):
             raise ClientException(detail="Incorrect password", status_code=400)
+
         if data.current_password == data.new_password:
             raise ClientException(
-                detail="New password cannot be the same as the current one",
+                detail="New password cannot be the same as the current password",
                 status_code=400,
             )
 
@@ -220,15 +249,15 @@ class UsersController(Controller):
         return Message(message="Password updated successfully")
 
     # ------------------------------------------------------------------
-    # DELETE /me — JWT required
+    # DELETE /me — Standard users only: Delete own account
     # ------------------------------------------------------------------
 
     @delete(
         path="/me",
         guards=[JWTAuthGuard()],
         status_code=HTTP_200_OK,
-        summary="Delete own user",
-        description="Delete current user account. Superusers cannot delete themselves.",
+        summary="Delete own account",
+        description="Standard users can delete their own account. Superusers are forbidden.",
     )
     async def delete_me(
         self,
@@ -256,7 +285,7 @@ class UsersController(Controller):
     # ------------------------------------------------------------------
 
     @post(
-        path=["", "/"],
+        path="",
         guards=[SuperuserGuard()],
         status_code=HTTP_201_CREATED,
         summary="Provision user (Admin)",
@@ -289,7 +318,7 @@ class UsersController(Controller):
     # ------------------------------------------------------------------
 
     @get(
-        path=["", "/"],
+        path="",
         guards=[SuperuserGuard()],
         status_code=HTTP_200_OK,
         summary="List users (Admin)",
@@ -337,10 +366,10 @@ class UsersController(Controller):
     # ------------------------------------------------------------------
 
     @patch(
-        path=["/{user_id:uuid}", "/{user_id:uuid}/role"],
+        path="/{user_id:uuid}",
         guards=[SuperuserGuard()],
         status_code=HTTP_200_OK,
-        summary="Update user role/status (Admin)",
+        summary="Update user details (Admin)",
         description="Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
     )
     async def update_user_admin(
@@ -349,27 +378,22 @@ class UsersController(Controller):
         data: UserAdminUpdate,
         user_repo: IUserRepository,
     ) -> UserRead:
-        user = await user_repo.get_by_id(user_id)
-        if user is None:
-            raise NotFoundException(detail="User not found.")
+        return await self._update_admin_user(user_id, data, user_repo)
 
-        if data.email and data.email != user.email:
-            existing = await user_repo.get_by_email(data.email)
-            if existing and existing.id != user_id:
-                raise ClientException(detail="User with this email already exists", status_code=409)
-            user.email = data.email
-
-        if data.full_name is not None:
-            user.full_name = data.full_name
-        if data.password is not None:
-            user.hashed_password = get_password_hash(data.password)
-        if data.is_active is not None:
-            user.is_active = data.is_active
-        if data.is_superuser is not None:
-            user.is_superuser = data.is_superuser
-
-        updated = await user_repo.update(user)
-        return _model_to_read(updated)
+    @patch(
+        path="/{user_id:uuid}/role",
+        guards=[SuperuserGuard()],
+        status_code=HTTP_200_OK,
+        summary="Update user role/status (Admin)",
+        description="Superadmin endpoint to assign roles, activate/deactivate accounts, or update profiles.",
+    )
+    async def update_user_role_admin(
+        self,
+        user_id: uuid.UUID,
+        data: UserAdminUpdate,
+        user_repo: IUserRepository,
+    ) -> UserRead:
+        return await self._update_admin_user(user_id, data, user_repo)
 
     # ------------------------------------------------------------------
     # DELETE /{user_id} — Superadmin only: Delete user
