@@ -78,6 +78,17 @@ up: ## Start all core mesh services (App, Worker, PostgreSQL, Valkey, Traefik) i
 	@$(COMPOSE_BASE) up -d
 	@echo -e "$(GREEN)✅ Stack running. API available at http://localhost:8000$(NC)"
 
+.PHONY: prod-up
+prod-up: ## Start full production stack including Cloudflare tunnel
+	@echo -e "$(BLUE)Starting full production stack with Cloudflare tunnel...$(NC)"
+	@$(COMPOSE_BASE) --profile production up -d
+	@echo -e "$(GREEN)✅ Production stack and Cloudflare tunnel started$(NC)"
+
+.PHONY: prod-logs
+prod-logs: ## Stream production container logs including tunnel
+	@echo -e "$(YELLOW)Streaming production stack logs (including Cloudflare tunnel)...$(NC)"
+	@$(COMPOSE_BASE) --profile production logs -f
+
 .PHONY: up-dev
 up-dev: ## Rebuild and start container mesh in background with live volume mounts
 	@echo -e "$(BLUE)Building and starting development stack...$(NC)"

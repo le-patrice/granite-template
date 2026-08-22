@@ -63,6 +63,24 @@ def setup_logging() -> None:
 logger = structlog.get_logger("litestar")
 
 
+def extract_client_ip(scope: Scope) -> str:
+    """Extract real client IP prioritized by Cloudflare, X-Forwarded-For, or ASGI client."""
+    headers = scope.get("headers", [])
+    header_map = {k.lower(): v.decode("utf-8", errors="ignore").strip() for k, v in headers}
+
+    if cf_ip := header_map.get("cf-connecting-ip"):
+        return cf_ip
+
+    if xff := header_map.get("x-forwarded-for"):
+        return xff.split(",")[0].strip()
+
+    client = scope.get("client")
+    if client and len(client) > 0 and client[0]:
+        return str(client[0])
+
+    return "127.0.0.1"
+
+
 class RequestLoggingMiddleware(AbstractMiddleware):
     """ASGI Middleware to log every incoming HTTP request/response cycle in real time."""
 
@@ -77,8 +95,7 @@ class RequestLoggingMiddleware(AbstractMiddleware):
 
         path = scope.get("path", "")
         method = scope.get("method", "GET")
-        client = scope.get("client")
-        client_ip = client[0] if client else "127.0.0.1"
+        client_ip = extract_client_ip(scope)
         start_time = time.monotonic()
         status_code = 200
 

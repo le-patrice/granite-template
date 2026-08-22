@@ -34,6 +34,24 @@ end
 """
 
 
+def extract_client_ip(scope: Scope) -> str:
+    """Extract real client IP prioritized by Cloudflare, X-Forwarded-For, or ASGI client."""
+    headers = scope.get("headers", [])
+    header_map = {k.lower(): v.decode("utf-8", errors="ignore").strip() for k, v in headers}
+
+    if cf_ip := header_map.get("cf-connecting-ip"):
+        return cf_ip
+
+    if xff := header_map.get("x-forwarded-for"):
+        return xff.split(",")[0].strip()
+
+    client = scope.get("client")
+    if client and len(client) > 0 and client[0]:
+        return str(client[0])
+
+    return "127.0.0.1"
+
+
 class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
     """Sliding-window atomic rate limiter evaluating traffic quotas per category and IP."""
 
@@ -58,16 +76,7 @@ class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
             limit = 120
             category = "api"
 
-        client_ip = "127.0.0.1"
-        for header, value in scope.get("headers", []):
-            if header == b"x-forwarded-for":
-                client_ip = value.decode("utf-8", errors="ignore").split(",")[0].strip()
-                break
-        else:
-            client = scope.get("client")
-            if client and len(client) > 0 and client[0]:
-                client_ip = str(client[0])
-
+        client_ip = extract_client_ip(scope)
         now = int(time.time())
         window_size = 60
         current_window = now // window_size
