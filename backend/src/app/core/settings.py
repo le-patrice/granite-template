@@ -39,6 +39,12 @@ class AppSettings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str = "AdminSecurePassword2026!"
     FIRST_SUPERUSER_NAME: str = "Platform Administrator"
 
+    # ── Rate Limiting & Gateway ───────────────────────────────────────────────
+    RATE_LIMIT_ENABLED: bool = True
+
+    # ── API Documentation UI ──────────────────────────────────────────────────
+    DOCS_UI: str = "swagger"  # swagger | scalar | redoc | elements | rapidoc
+
     # ── Observability & Crash Reporting ───────────────────────────────────────
     SENTRY_DSN: str | None = None
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0

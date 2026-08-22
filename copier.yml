@@ -63,6 +63,20 @@ app_port:
   default: 8000
 
 # ------------------------------------------------------------------------------
+# API Documentation & Interactive UI Selection
+# ------------------------------------------------------------------------------
+docs_ui:
+  type: str
+  help: "Default OpenAPI interactive documentation renderer (renders on /docs)"
+  choices:
+    - "swagger"
+    - "scalar"
+    - "redoc"
+    - "elements"
+    - "rapidoc"
+  default: "swagger"
+
+# ------------------------------------------------------------------------------
 # Data Persistence, Search & Pooling
 # ------------------------------------------------------------------------------
 postgres_user:
@@ -120,7 +134,7 @@ include_idempotency_guard:
 
 include_rate_limiting:
   type: bool
-  help: "Include sliding-window rate limiting middleware on public and auth endpoints"
+  help: "Include dual-tier sliding-window rate limiting middleware (Traefik edge + Valkey atomic Lua)"
   default: true
 
 # ------------------------------------------------------------------------------

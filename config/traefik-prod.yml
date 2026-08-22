@@ -67,10 +67,15 @@ http:
         customResponseHeaders:
           X-Powered-By: ""
 
-    rate-limit:
+    # ── Rate Limiting (Global Edge Throttling) ──────────────────────────────
+    global-ratelimit:
       rateLimit:
-        average: 100
-        burst: 200
+        average: 150
+        burst: 50
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
 
   routers:
     # API Router
@@ -82,7 +87,7 @@ http:
       middlewares:
         - cors-headers
         - secure-headers
-        - rate-limit
+        - global-ratelimit
 
     # Docs Router
     docs-router:

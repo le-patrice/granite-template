@@ -20,7 +20,8 @@ Requires in pyproject.toml [dev]:
     httpx>=0.27
 """
 
-import asyncio
+from __future__ import annotations
+
 import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -40,31 +41,17 @@ from app import app as litestar_app
 from app.core.settings import settings
 
 # ---------------------------------------------------------------------------
-# Event-loop: one shared loop for the whole test session.
-# pytest-asyncio >= 0.21 requires explicit asyncio_mode in pytest.ini / pyproject
-# or the loop_scope kwarg shown here.
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Session-scoped event loop so all async fixtures share the same loop."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-# ---------------------------------------------------------------------------
-# Database engine — created once per session, never pooled in tests.
+# Session-scoped engine — connected to the live database container.
 # ---------------------------------------------------------------------------
 
 
 @pytest_asyncio.fixture(scope="session")
 async def async_engine():
     """
-    Async engine connected to the same DATABASE_URL the application uses.
-    NullPool is mandatory for test isolation: each connection is independent
-    so nested transactions work correctly.
+    Create a single async engine for the entire test session.
+
+    Uses poolclass=NullPool so every checkout is a fresh connection and
+    there are no pool-state leaks across tests.
     """
     from sqlalchemy.pool import NullPool
 
@@ -114,19 +101,10 @@ async def ensure_db_schema(async_engine):
 @pytest_asyncio.fixture()
 async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     """
-    Wraps every test in a savepoint (nested transaction).
+    Provide an AsyncSession wrapped in an outer transaction + SAVEPOINT.
 
-    Strategy
-    --------
-    1.  Open a raw connection and start an outer TRANSACTION.
-    2.  Bind an AsyncSession to that connection.
-    3.  Begin a SAVEPOINT inside the outer transaction.
-    4.  Yield the session for the test to use.
-    5.  Roll back to the savepoint on teardown — database state is pristine.
-    6.  Roll back the outer transaction and close the connection.
-
-    This means actual COMMIT calls inside the application code commit to the
-    savepoint only, not to the real database.
+    At the end of every test, the savepoint is rolled back, guaranteeing
+    that no test mutates the database for subsequent tests.
     """
     async with async_engine.connect() as conn:
         outer_tx: AsyncTransaction = await conn.begin()
@@ -174,6 +152,19 @@ def mock_valkey():
 # ---------------------------------------------------------------------------
 
 
+async def _flush_rate_limits() -> None:
+    try:
+        from app.core.cache import get_valkey_pool
+
+        valkey_client = get_valkey_pool()
+        if valkey_client is not None:
+            keys = await valkey_client.keys("rl:*")
+            if keys:
+                await valkey_client.delete(*keys)
+    except Exception:  # noqa: S110, BLE001
+        pass
+
+
 @pytest_asyncio.fixture()
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """
@@ -183,8 +174,10 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
     shutdown hooks for the DB plugin, stores, etc.) and tears it down
     cleanly after each test.
     """
+    await _flush_rate_limits()
     async with AsyncTestClient(app=litestar_app) as client:
         yield client
+    await _flush_rate_limits()
 
 
 # ---------------------------------------------------------------------------

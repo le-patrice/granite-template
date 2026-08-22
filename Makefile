@@ -308,7 +308,7 @@ db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups
 .PHONY: export-schema
 export-schema: ## Export Litestar OpenAPI 3.1 schema to frontend/openapi.json
 	@echo -e "$(YELLOW)Extracting OpenAPI schema...$(NC)"
-	@python backend/scripts/export_schemas.py 2>/dev/null || $(EXEC_APP) python scripts/export_schemas.py > frontend/openapi.json 2>/dev/null || true
+	@$(EXEC_APP) python -c "from app.main import app; import json; print(json.dumps(app.openapi_schema.to_schema(), indent=2))" > frontend/openapi.json
 	@echo -e "$(GREEN)✅ Exported to frontend/openapi.json$(NC)"
 
 .PHONY: frontend-sync

@@ -182,3 +182,34 @@ class TestTransactionalOutbox:
         replayed = await repo.replay_dead_letter(target_dl.id)
         assert replayed is not None
         assert replayed.status == OutboxStatus.PENDING
+
+
+# ---------------------------------------------------------------------------
+# 6. Sliding-Window Rate Limiter Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestSlidingWindowRateLimiter:
+    async def test_auth_login_rate_limiting_triggers_429(self, async_client: AsyncClient):
+        responses = []
+        payload = {"email": "ratelimit.test@example.com", "password": "WrongPassword123!"}
+        for _ in range(6):
+            resp = await async_client.post("/api/v1/auth/login", json=payload)
+            responses.append(resp)
+
+        # First 5 should not be rate-limited (401 for wrong credentials)
+        for resp in responses[:5]:
+            assert resp.status_code != 429
+            assert "ratelimit-limit" in resp.headers or "RateLimit-Limit" in resp.headers
+
+        # 6th attempt should be throttled with 429 Too Many Requests
+        sixth = responses[5]
+        assert sixth.status_code == 429
+        assert sixth.json().get("error") == "Too Many Requests"
+        assert "Retry-After" in sixth.headers or "retry-after" in sixth.headers
+        assert "RateLimit-Limit" in sixth.headers or "ratelimit-limit" in sixth.headers
+        assert (
+            sixth.headers.get("RateLimit-Remaining") == "0"
+            or sixth.headers.get("ratelimit-remaining") == "0"
+        )

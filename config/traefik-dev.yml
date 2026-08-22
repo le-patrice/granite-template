@@ -96,11 +96,15 @@ http:
         customResponseHeaders:
           X-Powered-By: ""
 
-    # ── Rate Limiting (Dev) ─────────────────────────────────────────────────
-    rate-limit:
+    # ── Rate Limiting (Global Edge Throttling) ──────────────────────────────
+    global-ratelimit:
       rateLimit:
-        average: 500
-        burst: 1000
+        average: 150
+        burst: 50
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
 
   # ── Routers ────────────────────────────────────────────────────────────────
   routers:
@@ -114,7 +118,7 @@ http:
       middlewares:
         - cors-headers
         - secure-headers
-        - rate-limit
+        - global-ratelimit
 
     # 2. Docs Router (Host docs.* or Path /docs, /scalar, /swagger)
     docs-router:

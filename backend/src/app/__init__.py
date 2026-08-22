@@ -7,6 +7,7 @@ from app.core.idempotency import IdempotencyMiddleware
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 from app.core.metrics import PrometheusMetricsMiddleware, metrics_endpoint
 from app.core.openapi import openapi_config
+from app.core.rate_limit import SlidingWindowRateLimitMiddleware
 from app.core.settings import settings
 from app.presentation.api.router import api_router
 from app.presentation.api.v1.health_controller import HealthController
@@ -46,10 +47,20 @@ async def init_admin_user() -> None:
         logger.warning("superuser_startup_seed_deferred", error=str(exc))
 
 
+middleware_list = [
+    RequestLoggingMiddleware,
+    PrometheusMetricsMiddleware,
+    IdempotencyMiddleware,
+]
+
+if settings.RATE_LIMIT_ENABLED:
+    middleware_list.append(SlidingWindowRateLimitMiddleware)
+
+
 app = Litestar(
     route_handlers=[HealthController, metrics_endpoint, api_router],
     plugins=[alchemy_plugin],
-    middleware=[RequestLoggingMiddleware, PrometheusMetricsMiddleware, IdempotencyMiddleware],
+    middleware=middleware_list,
     stores={"valkey": valkey_store},
     openapi_config=openapi_config if settings.ENVIRONMENT != "production" else None,
     debug=settings.DEBUG,

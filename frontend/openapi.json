@@ -127,11 +127,11 @@
         "deprecated": false
       }
     },
-    "/api/v1/auth/token": {
+    "/api/v1/auth/login": {
       "post": {
         "summary": "Obtain bearer token",
         "description": "Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.",
-        "operationId": "ApiV1AuthTokenLogin",
+        "operationId": "ApiV1AuthLoginLogin",
         "responses": {
           "201": {
             "description": "Document created, URL follows",
@@ -148,11 +148,11 @@
         "deprecated": false
       }
     },
-    "/api/v1/auth/login": {
+    "/api/v1/auth/token": {
       "post": {
         "summary": "Obtain bearer token",
         "description": "Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.",
-        "operationId": "ApiV1AuthLoginLogin",
+        "operationId": "ApiV1AuthTokenLogin",
         "responses": {
           "201": {
             "description": "Document created, URL follows",

@@ -118,25 +118,6 @@ export const metricsMetricsEndpoint = <ThrowOnError extends boolean = false>(opt
  *
  * Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.
  */
-export const apiV1AuthTokenLogin = <ThrowOnError extends boolean = false>(options?: Options<ApiV1AuthTokenLoginData, ThrowOnError>): RequestResult<ApiV1AuthTokenLoginResponses, unknown, ThrowOnError> => (options?.client ?? client).post<ApiV1AuthTokenLoginResponses, unknown, ThrowOnError>({
-    security: [{
-            key: 'BearerAuth',
-            scheme: 'bearer',
-            type: 'http'
-        }, {
-            key: 'OAuth2Password',
-            scheme: 'bearer',
-            type: 'http'
-        }],
-    url: '/api/v1/auth/token',
-    ...options
-});
-
-/**
- * Obtain bearer token
- *
- * Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.
- */
 export const apiV1AuthLoginLogin = <ThrowOnError extends boolean = false>(options?: Options<ApiV1AuthLoginLoginData, ThrowOnError>): RequestResult<ApiV1AuthLoginLoginResponses, unknown, ThrowOnError> => (options?.client ?? client).post<ApiV1AuthLoginLoginResponses, unknown, ThrowOnError>({
     security: [{
             key: 'BearerAuth',
@@ -148,6 +129,25 @@ export const apiV1AuthLoginLogin = <ThrowOnError extends boolean = false>(option
             type: 'http'
         }],
     url: '/api/v1/auth/login',
+    ...options
+});
+
+/**
+ * Obtain bearer token
+ *
+ * Exchange email/username + password for a signed JWT bearer token. Supports JSON & OAuth2 form.
+ */
+export const apiV1AuthTokenLogin = <ThrowOnError extends boolean = false>(options?: Options<ApiV1AuthTokenLoginData, ThrowOnError>): RequestResult<ApiV1AuthTokenLoginResponses, unknown, ThrowOnError> => (options?.client ?? client).post<ApiV1AuthTokenLoginResponses, unknown, ThrowOnError>({
+    security: [{
+            key: 'BearerAuth',
+            scheme: 'bearer',
+            type: 'http'
+        }, {
+            key: 'OAuth2Password',
+            scheme: 'bearer',
+            type: 'http'
+        }],
+    url: '/api/v1/auth/token',
     ...options
 });
 

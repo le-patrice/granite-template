@@ -187,22 +187,6 @@ export type MetricsMetricsEndpointResponses = {
 
 export type MetricsMetricsEndpointResponse = MetricsMetricsEndpointResponses[keyof MetricsMetricsEndpointResponses];
 
-export type ApiV1AuthTokenLoginData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/auth/token';
-};
-
-export type ApiV1AuthTokenLoginResponses = {
-    /**
-     * Document created, URL follows
-     */
-    201: TokenResponse;
-};
-
-export type ApiV1AuthTokenLoginResponse = ApiV1AuthTokenLoginResponses[keyof ApiV1AuthTokenLoginResponses];
-
 export type ApiV1AuthLoginLoginData = {
     body?: never;
     path?: never;
@@ -218,6 +202,22 @@ export type ApiV1AuthLoginLoginResponses = {
 };
 
 export type ApiV1AuthLoginLoginResponse = ApiV1AuthLoginLoginResponses[keyof ApiV1AuthLoginLoginResponses];
+
+export type ApiV1AuthTokenLoginData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/token';
+};
+
+export type ApiV1AuthTokenLoginResponses = {
+    /**
+     * Document created, URL follows
+     */
+    201: TokenResponse;
+};
+
+export type ApiV1AuthTokenLoginResponse = ApiV1AuthTokenLoginResponses[keyof ApiV1AuthTokenLoginResponses];
 
 export type ApiV1AuthLogoutLogoutData = {
     body?: never;
