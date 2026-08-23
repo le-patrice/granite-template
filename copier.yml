@@ -182,12 +182,12 @@ include_cloudflare_tunnel:
 secret_key:
   type: str
   help: "Application JWT signing secret key (64-hex char recommended)"
-  default: "{{ 9999999999999999999999999999999999999999999999999999999999999999 | random | string | hash('sha256') }}"
+  default: "{% for _ in range(64) %}{{ '0123456789abcdef' | random }}{% endfor %}"
 
 postgres_password:
   type: str
   help: "PostgreSQL superuser password (auto-generated alphanumeric)"
-  default: "dev_{{ 9999999999999999 | random | string | hash('sha256') | truncate(20, True, '') }}"
+  default: "dev_{% for _ in range(20) %}{{ 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' | random }}{% endfor %}"
 
 first_superuser_email:
   type: str
@@ -197,7 +197,7 @@ first_superuser_email:
 first_superuser_password:
   type: str
   help: "Initial superuser login password (auto-generated)"
-  default: "Admin!{{ 9999999999999999 | random | string | hash('sha256') | truncate(16, True, '') }}"
+  default: "Admin!{% for _ in range(16) %}{{ 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' | random }}{% endfor %}"
 
 # ------------------------------------------------------------------------------
 # Git Initialization & Automated Stack Bootstrap

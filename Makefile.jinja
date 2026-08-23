@@ -213,7 +213,7 @@ down-volumes: ## Stop stack and PERMANENTLY DESTROY all database data volumes
 down-check: ## Stop project and verify no lingering containers remain on host
 	@$(COMPOSE_BASE) down
 	@echo -e "$(YELLOW)Checking for remaining project containers...$(NC)"
-	@$(CONTAINER_ENGINE) ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E 'app|worker|postgres|valkey|traefik|pgbouncer' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
+	@$(CONTAINER_ENGINE) ps --format {% raw %}'table {{.Names}}\t{{.Status}}\t{{.Image}}'{% endraw %} | grep -E 'app|worker|postgres|valkey|traefik|pgbouncer' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
 
 .PHONY: stop
 stop: ## Stop all services or a specific target (e.g., make stop SERVICE=app)
