@@ -14,7 +14,7 @@ project_name:
 
 project_slug:
   type: str
-  help: "Slugified project identifier (used for folders, images, network names)"
+  help: "Slugified project identifier (used for container naming prefix, images, networks, and volumes)"
   default: "{{ project_name|lower|replace(' ', '-')|replace('_', '-') }}"
 
 project_package:
