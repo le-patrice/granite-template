@@ -1,5 +1,5 @@
 # ==============================================================================
-# LiteForge / Enterprise Platform — Git Ignore Rules
+# {{ project_name }} — Git Ignore Rules
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -65,6 +65,7 @@ junit.xml
 # ------------------------------------------------------------------------------
 # Node.js & Frontend Build Artifacts
 # ------------------------------------------------------------------------------
+{% if include_frontend %}
 node_modules/
 **/node_modules/
 npm-debug.log*
@@ -79,6 +80,7 @@ dist/
 .astro/
 .output/
 .turbo/
+{% endif %}
 
 # ------------------------------------------------------------------------------
 # Databases, Volumes & Backups
@@ -102,7 +104,9 @@ backend/logs/
 *.pid
 *.seed
 *.pid.lock
+{% if include_traefik %}
 acme.json
+{% endif %}
 
 # ------------------------------------------------------------------------------
 # Operating Systems & IDE Workspace Configurations

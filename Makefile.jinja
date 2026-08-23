@@ -13,6 +13,8 @@ BLUE   := \033[0;34m
 GREEN  := \033[0;32m
 YELLOW := \033[1;33m
 RED    := \033[0;31m
+CYAN   := \033[0;36m
+BOLD   := \033[1m
 NC     := \033[0m # No Color
 
 # ------------------------------------------------------------------------------
@@ -26,9 +28,12 @@ ENV_FILE         ?= --env-file .env
 export CONTAINER_HOST ?= unix:///run/user/$(shell id -u)/podman/podman.sock
 
 # Execution wrappers
-COMPOSE_BASE := $(CONTAINER_ENGINE) compose $(COMPOSE_FILE)
-EXEC_APP     := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i backend
-EXEC_DB      := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i postgres_db
+COMPOSE_BASE  := $(CONTAINER_ENGINE) compose $(COMPOSE_FILE)
+EXEC_APP      := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i backend
+EXEC_DB       := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i postgres_db
+{% if include_frontend %}
+EXEC_FRONTEND := $(COMPOSE_BASE) exec -T frontend 2>/dev/null || $(CONTAINER_ENGINE) exec -i frontend_dev
+{% endif %}
 
 # Command argument overrides
 SERVICE ?= app
@@ -44,43 +49,130 @@ CONFIRM_LIVE_RESTORE ?= NO
 .PHONY: help
 help: ## Show this interactive help banner
 	@echo -e ""
-	@echo -e "$(BLUE)╔══════════════════════════════════════════════════════════════════╗$(NC)"
-	@echo -e "$(BLUE)║   {{ project_name }} — $(CONTAINER_ENGINE) Automation Engine$(NC)"
-	@echo -e "$(BLUE)╚══════════════════════════════════════════════════════════════════╝$(NC)"
+	@echo -e "$(BLUE)╔══════════════════════════════════════════════════════════════════════╗$(NC)"
+	@echo -e "$(BLUE)║   $(BOLD){{ project_name }} — $(CONTAINER_ENGINE) Automation Engine$(NC)$(BLUE)          ║$(NC)"
+	@echo -e "$(BLUE)╚══════════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo -e ""
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-24s$(NC) %s\n", $$1, $$2}'
-	@echo -e ""
-	@echo -e "$(YELLOW)Common Workflows:$(NC)"
-	@echo -e "  make up                           # Boot full container mesh in background ($(CONTAINER_ENGINE) default)"
-	@echo -e "  make up-dev                       # Boot container mesh with forced image rebuild"
-	@echo -e "  make logs SERVICE=app             # Tail live logs for a specific service"
-	@echo -e "  make worker                       # Start or ensure SAQ background worker is running"
-	@echo -e "  make worker-logs                  # Tail live logs from SAQ background worker"
-	@echo -e "  make metrics                      # Inspect Prometheus scrapable metrics endpoint"
-	@echo -e "  make outbox-relay                 # Trigger a sweep of pending transactional outbox events"
-	@echo -e "  make dlq-replay                   # Replay quarantined Dead Letter Queue events"
+	@echo -e "$(CYAN)$(BOLD)Automated High-Level Workflows:$(NC)"
+	@echo -e "  $(GREEN)make setup$(NC)              # 1-Click Bootstrap: build, boot, migrate, seed, and sync SDK"
+	@echo -e "  $(GREEN)make dev$(NC)                # Developer Mode: boot mesh, apply migrations, sync SDK & tail logs"
+	@echo -e "  $(GREEN)make check$(NC)              # Full QA Gate: lint, format, pytest, zero-drift, frontend build"
+	@echo -e "  $(GREEN)make reset$(NC)              # Complete Clean Reset: wipe volumes, rebuild images, migrate & reseed"
 {% if include_cloudflare_tunnel %}
-	@echo -e "  make tunnel-status                # Check Cloudflare Zero Trust Tunnel container status"
-	@echo -e "  make tunnel-logs                  # Tail live logs from Cloudflare Tunnel container"
+	@echo -e "  $(GREEN)make prod$(NC)               # Production Launch: boot stack with Cloudflare tunnel & trusted proxy"
 {% endif %}
-	@echo -e "  make migrate                      # Run Alembic migrations inside app container"
-	@echo -e "  make seed                         # Seed initial superuser into database"
-{% if include_frontend %}
-	@echo -e "  make frontend-sync                # Export OpenAPI spec & compile TypeScript SDK"
-{% endif %}
-	@echo -e "  make test                         # Run isolated pytest suite inside container"
-	@echo -e "  make db-backup                    # Dump timestamped compressed PostgreSQL backup"
-	@echo -e "  CONTAINER_ENGINE=docker make up   # Override runtime engine to Docker on demand"
 	@echo -e ""
+	@echo -e "$(YELLOW)$(BOLD)All Individual Targets:$(NC)"
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-22s$(NC) %s\n", $$1, $$2}'
+	@echo -e ""
+
+# ------------------------------------------------------------------------------
+# High-Level Automated Workflows (Compound Super-Targets)
+# ------------------------------------------------------------------------------
+.PHONY: setup bootstrap
+setup: bootstrap ## 1-Click Zero-Config Bootstrap: build, boot, migrate, seed superadmin, and sync SDK
+bootstrap:
+	@echo -e "$(BLUE)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@echo -e "$(BLUE)$(BOLD)🚀 Launching Automated Platform Bootstrap via $(CONTAINER_ENGINE)...$(NC)"
+	@echo -e "$(BLUE)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@if [ ! -f .env ]; then \
+		echo -e "$(YELLOW)Creating .env from .env.example with secure defaults...$(NC)"; \
+		cp .env.example .env; \
+	fi
+	@echo -e "$(BLUE)Step 1/6: Building container images...$(NC)"
+	@$(MAKE) build
+	@echo -e "$(BLUE)Step 2/6: Starting core container mesh in background...$(NC)"
+	@$(MAKE) up
+	@echo -e "$(BLUE)Step 3/6: Waiting for PostgreSQL readiness...$(NC)"
+	@for i in {1..30}; do \
+		if $(EXEC_DB) pg_isready -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "{{ postgres_user }}") -d $$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo "{{ postgres_db }}") >/dev/null 2>&1; then \
+			echo -e "$(GREEN)✅ PostgreSQL is accepting connections$(NC)"; \
+			break; \
+		fi; \
+		echo -e "$(YELLOW)Waiting for database (attempt $$i/30)...$(NC)"; \
+		sleep 1; \
+	done
+	@echo -e "$(BLUE)Step 4/6: Applying database migrations...$(NC)"
+	@$(MAKE) migrate
+	@echo -e "$(BLUE)Step 5/6: Seeding initial superuser account...$(NC)"
+	@$(MAKE) seed
+{% if include_frontend %}
+	@echo -e "$(BLUE)Step 6/6: Synchronizing OpenAPI schema and TypeScript frontend client SDK...$(NC)"
+	@$(MAKE) frontend-sync
+{% endif %}
+	@echo -e ""
+	@echo -e "$(GREEN)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@echo -e "$(GREEN)$(BOLD)🎉 Platform Bootstrap Complete & Fully Operational!$(NC)"
+	@echo -e "$(GREEN)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@echo -e "  $(CYAN)• API & Docs UI:$(NC)    http://localhost:{{ app_port }}/docs"
+{% if include_prometheus_metrics %}
+	@echo -e "  $(CYAN)• Prometheus:$(NC)       http://localhost:{{ app_port }}/metrics"
+{% endif %}
+	@echo -e "  $(CYAN)• Health Probes:$(NC)    http://localhost:{{ app_port }}/health/ready"
+	@echo -e "  $(CYAN)• Superadmin Email:$(NC) $$(grep FIRST_SUPERUSER_EMAIL .env | cut -d= -f2 2>/dev/null || echo '{{ first_superuser_email }}')"
+	@echo -e "  $(CYAN)• Tail live logs:$(NC)   make logs"
+	@echo -e ""
+
+.PHONY: dev
+dev: ## Daily Developer Mode: start mesh, apply migrations, sync SDK, and stream logs
+	@echo -e "$(BLUE)Starting developer mode with $(CONTAINER_ENGINE)...$(NC)"
+	@$(MAKE) up
+	@$(MAKE) migrate
+{% if include_frontend %}
+	@$(MAKE) frontend-sync
+{% endif %}
+	@$(MAKE) logs
+
+.PHONY: check verify
+check: verify ## Run full automated QA verification suite (lint, pytest, zero-drift, frontend build)
+verify:
+	@echo -e "$(BLUE)$(BOLD)Running full automated QA verification gate...$(NC)"
+	@$(MAKE) lint
+	@$(MAKE) test
+{% if include_frontend %}
+	@$(MAKE) check-client-drift
+	@$(MAKE) frontend-build
+{% endif %}
+	@echo -e "$(GREEN)$(BOLD)✅ All QA checks passed cleanly! Zero errors, zero schema drift.$(NC)"
+
+.PHONY: reset
+reset: ## Complete clean reset: wipe volumes, rebuild images, migrate & reseed
+	@echo -e "$(RED)$(BOLD)⚠️  CAUTION: This will destroy all database volumes and recreate the environment.$(NC)"
+	@read -p "Are you sure you want to proceed with full reset? [y/N] " -n 1 -r; \
+	echo ""; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		$(MAKE) down-volumes; \
+		$(MAKE) setup; \
+	else \
+		echo -e "$(YELLOW)Reset aborted by user.$(NC)"; \
+	fi
+
+{% if include_cloudflare_tunnel %}
+.PHONY: prod
+prod: prod-up ## Production Stack Launch: start all services with Cloudflare tunnel
+{% endif %}
 
 # ------------------------------------------------------------------------------
 # Stack Lifecycle Management
 # ------------------------------------------------------------------------------
 .PHONY: up
-up: ## Start all core mesh services (App, Worker, PostgreSQL, Valkey, Traefik) in background
+up: ## Start all core mesh services in background
 	@echo -e "$(BLUE)Starting services with $(CONTAINER_ENGINE)...$(NC)"
 	@$(COMPOSE_BASE) up -d
 	@echo -e "$(GREEN)✅ Stack running. API available at http://localhost:{{ app_port }}$(NC)"
+
+{% if include_cloudflare_tunnel %}
+.PHONY: prod-up
+prod-up: ## Start full production stack including Cloudflare tunnel
+	@echo -e "$(BLUE)Starting full production stack with Cloudflare tunnel...$(NC)"
+	@$(COMPOSE_BASE) --profile production up -d
+	@echo -e "$(GREEN)✅ Production stack and Cloudflare tunnel started$(NC)"
+
+.PHONY: prod-logs
+prod-logs: ## Stream production container logs including tunnel
+	@echo -e "$(YELLOW)Streaming production stack logs (including Cloudflare tunnel)...$(NC)"
+	@$(COMPOSE_BASE) --profile production logs -f
+{% endif %}
 
 .PHONY: up-dev
 up-dev: ## Rebuild and start container mesh in background with live volume mounts
@@ -88,6 +180,7 @@ up-dev: ## Rebuild and start container mesh in background with live volume mount
 	@$(COMPOSE_BASE) up -d --build
 	@echo -e "$(GREEN)✅ Development stack started$(NC)"
 
+{% if include_distributed_worker %}
 .PHONY: worker
 worker: ## Start or ensure background task worker container is running
 	@echo -e "$(BLUE)Starting SAQ background worker container...$(NC)"
@@ -98,6 +191,7 @@ worker: ## Start or ensure background task worker container is running
 worker-logs: ## Tail live logs from SAQ distributed background task worker
 	@echo -e "$(BLUE)Tailing SAQ background worker logs...$(NC)"
 	@$(COMPOSE_BASE) logs -f --tail=200 worker
+{% endif %}
 
 .PHONY: down
 down: ## Stop and remove stack containers (preserves database volumes)
@@ -147,17 +241,27 @@ logs: ## Stream live logs from all stack containers in real time
 logs-api: ## Stream live logs specifically from the Litestar backend API
 	@$(COMPOSE_BASE) logs -f --tail=100 app
 
+{% if include_frontend %}
+.PHONY: logs-frontend
+logs-frontend: ## Stream live logs from Vite frontend dev server
+	@$(COMPOSE_BASE) logs -f --tail=100 frontend
+{% endif %}
+
+{% if include_distributed_worker %}
 .PHONY: logs-worker
 logs-worker: ## Stream live logs from the SAQ background worker
 	@$(COMPOSE_BASE) logs -f --tail=100 worker
+{% endif %}
 
 .PHONY: logs-db
 logs-db: ## Stream live logs from PostgreSQL / TimescaleDB
 	@$(COMPOSE_BASE) logs -f --tail=100 postgres-db
 
+{% if include_traefik %}
 .PHONY: logs-traefik
 logs-traefik: ## Stream live access logs from the Traefik edge proxy
 	@$(COMPOSE_BASE) logs -f --tail=100 traefik
+{% endif %}
 
 .PHONY: clean-logs
 clean-logs: ## Recreate containers to flush stale log output
@@ -175,9 +279,11 @@ health: ## Perform HTTP health check against local Litestar instance
 	@echo -e "$(YELLOW)Checking backend health...$(NC)"
 	@curl -fsS http://localhost:{{ app_port }}/health/ready >/dev/null && echo -e "$(GREEN)✅ Backend is healthy & ready$(NC)" || echo -e "$(RED)❌ Backend not ready$(NC)"
 
+{% if include_prometheus_metrics %}
 .PHONY: metrics
 metrics: ## Fetch Prometheus metrics from /metrics endpoint
 	@curl -s http://localhost:{{ app_port }}/metrics
+{% endif %}
 
 .PHONY: stats
 stats: ## Stream real-time resource utilization (CPU, Memory, I/O)
@@ -245,11 +351,12 @@ seed: ## Seed initial platform superuser from environment settings
 
 .PHONY: db-shell
 db-shell: ## Open direct interactive psql console on running PostgreSQL container
-	@$(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d $$(grep POSTGRES_DB .env | cut -d= -f2)
+	@$(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "{{ postgres_user }}") -d $$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo "{{ postgres_db }}")
 
 # ------------------------------------------------------------------------------
 # Transactional Outbox & DLQ Operations
 # ------------------------------------------------------------------------------
+{% if include_transactional_outbox %}
 .PHONY: outbox-relay
 outbox-relay: ## Perform a manual sweep to relay pending outbox events to message broker
 	@echo -e "$(BLUE)Sweeping pending outbox events...$(NC)"
@@ -263,6 +370,7 @@ dlq-replay: ## Replay quarantined events from Dead Letter Queue back to Outbox
 .PHONY: outbox-status
 outbox-status: ## Check counts of pending outbox and dead letter events
 	@$(EXEC_APP) python scripts/outbox_cli.py status
+{% endif %}
 
 # ------------------------------------------------------------------------------
 # Database Backup & Disaster Recovery
@@ -271,7 +379,7 @@ outbox-status: ## Check counts of pending outbox and dead letter events
 db-backup: ## Dump compressed PostgreSQL custom-format archive into backups/
 	@mkdir -p backups
 	@echo -e "$(YELLOW)Extracting compressed PostgreSQL backup...$(NC)"
-	@$(EXEC_DB) pg_dump -U $$(grep POSTGRES_USER .env | cut -d= -f2) $$(grep POSTGRES_DB .env | cut -d= -f2) | gzip -9 > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql.gz
+	@$(EXEC_DB) pg_dump -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "{{ postgres_user }}") $$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo "{{ postgres_db }}") | gzip -9 > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql.gz
 	@echo -e "$(GREEN)✅ Backup saved to backups/$(NC)"
 
 .PHONY: db-backup-verify
@@ -290,40 +398,63 @@ db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups
 		exit 1; \
 	fi
 	@if [ -z "$(DB)" ]; then \
-		echo -e "$(RED)❌ DB is required.$(NC) Specify target database (e.g., DB=app_restore or DB=app_db)"; \
+		echo -e "$(RED)❌ DB is required.$(NC) Specify target database (e.g., DB=app_restore or DB={{ postgres_db }})"; \
 		exit 1; \
 	fi
-	@if [ "$(DB)" = "$$(grep POSTGRES_DB .env | cut -d= -f2)" ] && [ "$(CONFIRM_LIVE_RESTORE)" != "YES" ]; then \
+	@if [ "$(DB)" = "$$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo '{{ postgres_db }}')" ] && [ "$(CONFIRM_LIVE_RESTORE)" != "YES" ]; then \
 		echo -e "$(RED)❌ Refusing direct restore over live database without explicit confirmation.$(NC)"; \
 		echo -e "$(YELLOW)Pass CONFIRM_LIVE_RESTORE=YES or restore to an alternate database first.$(NC)"; \
 		exit 1; \
 	fi
 	@echo -e "$(YELLOW)Restoring $(FILE) into $(DB)...$(NC)"
-	@gzip -dc "$(FILE)" | $(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d "$(DB)"
+	@gzip -dc "$(FILE)" | $(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "{{ postgres_user }}") -d "$(DB)"
 	@echo -e "$(GREEN)✅ Database restored$(NC)"
 
 # ------------------------------------------------------------------------------
 # Schema Sync & TypeScript Frontend Client Generation
 # ------------------------------------------------------------------------------
+{% if include_frontend %}
 .PHONY: export-schema
 export-schema: ## Export Litestar OpenAPI 3.1 schema to frontend/openapi.json
 	@echo -e "$(YELLOW)Extracting OpenAPI schema...$(NC)"
-	@python backend/scripts/export_schemas.py 2>/dev/null || $(EXEC_APP) python -c "from app.main import app; import json; print(json.dumps(app.openapi_schema.to_schema(), indent=2))" > frontend/openapi.json
+	@$(EXEC_APP) python -c "from app.main import app; import json; print(json.dumps(app.openapi_schema.to_schema(), indent=2, sort_keys=True))" > frontend/openapi.json
 	@echo -e "$(GREEN)✅ Exported to frontend/openapi.json$(NC)"
 
 .PHONY: frontend-sync
 frontend-sync: export-schema ## Compile TypeScript fetch client from exported OpenAPI schema
 	@if [ -d "frontend" ]; then \
 		echo -e "$(BLUE)Generating frontend TypeScript client via @hey-api/openapi-ts...$(NC)"; \
-		cd frontend && npm run generate-client; \
+		$(EXEC_FRONTEND) npm run generate-client 2>/dev/null || (cd frontend && npm run generate-client); \
 		echo -e "$(GREEN)✅ Frontend API bindings updated in frontend/src/client/$(NC)"; \
 	else \
 		echo -e "$(YELLOW)Frontend directory not present. Skipping TypeScript generation.$(NC)"; \
 	fi
 
+.PHONY: check-client-drift
+check-client-drift: export-schema ## Validate zero drift between backend OpenAPI schema and frontend TypeScript client
+	@echo -e "$(BLUE)Validating zero client SDK schema drift...$(NC)"
+	@if [ -d "frontend" ]; then \
+		$(EXEC_FRONTEND) npm run generate-client 2>/dev/null || (cd frontend && npm run generate-client); \
+		if ! git diff --exit-code frontend/src/client frontend/openapi.json > /dev/null 2>&1; then \
+			echo -e "$(RED)❌ ERROR: Frontend SDK schema drift detected!$(NC)"; \
+			echo -e "$(YELLOW)Run 'make frontend-sync' and commit the updated client bindings.$(NC)"; \
+			git diff frontend/src/client frontend/openapi.json; \
+			exit 1; \
+		fi; \
+		echo -e "$(GREEN)✅ Zero SDK drift verified. Client bindings match backend OpenAPI schema exactly.$(NC)"; \
+	fi
+
+.PHONY: frontend-build
+frontend-build: ## Build production frontend distribution bundle inside container
+	@echo -e "$(BLUE)Building production frontend bundle...$(NC)"
+	@$(EXEC_FRONTEND) npm run build 2>/dev/null || (cd frontend && npm run build)
+	@echo -e "$(GREEN)✅ Frontend build complete in frontend/dist/$(NC)"
+{% endif %}
+
 # ------------------------------------------------------------------------------
 # Cloudflare Tunnel
 # ------------------------------------------------------------------------------
+{% if include_cloudflare_tunnel %}
 .PHONY: tunnel-status
 tunnel-status: ## Check Cloudflare Tunnel container health and status
 	@echo -e "$(YELLOW)Checking Cloudflare Tunnel status...$(NC)"
@@ -336,10 +467,18 @@ tunnel-logs: ## Tail live logs from the Cloudflare Tunnel container
 .PHONY: tunnel-restart
 tunnel-restart: ## Restart the Cloudflare Tunnel container
 	@$(COMPOSE_BASE) restart cloudflared
+{% endif %}
 
 # ------------------------------------------------------------------------------
-# Automated Testing
+# Quality Assurance & Testing
 # ------------------------------------------------------------------------------
+.PHONY: lint
+lint: ## Run Ruff linter and formatter checks inside backend container
+	@echo -e "$(BLUE)Running Ruff linter and format check...$(NC)"
+	@$(EXEC_APP) ruff check src tests
+	@$(EXEC_APP) ruff format --check src tests
+	@echo -e "$(GREEN)✅ Ruff lint and formatting passed cleanly$(NC)"
+
 .PHONY: test
 test: ## Run test suite inside app container using isolated database subtransactions
 	@echo -e "$(BLUE)Executing pytest suite inside container...$(NC)"

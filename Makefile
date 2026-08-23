@@ -13,6 +13,8 @@ BLUE   := \033[0;34m
 GREEN  := \033[0;32m
 YELLOW := \033[1;33m
 RED    := \033[0;31m
+CYAN   := \033[0;36m
+BOLD   := \033[1m
 NC     := \033[0m # No Color
 
 # ------------------------------------------------------------------------------
@@ -45,29 +47,96 @@ CONFIRM_LIVE_RESTORE ?= NO
 .PHONY: help
 help: ## Show this interactive help banner
 	@echo -e ""
-	@echo -e "$(BLUE)╔══════════════════════════════════════════════════════════════════╗$(NC)"
-	@echo -e "$(BLUE)║   LiteForge Control Plane — Podman/Docker Automation Engine      ║$(NC)"
-	@echo -e "$(BLUE)╚══════════════════════════════════════════════════════════════════╝$(NC)"
+	@echo -e "$(BLUE)╔══════════════════════════════════════════════════════════════════════╗$(NC)"
+	@echo -e "$(BLUE)║   $(BOLD)LiteForge Control Plane — Podman/Docker Automation Engine$(NC)$(BLUE)          ║$(NC)"
+	@echo -e "$(BLUE)╚══════════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo -e ""
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-24s$(NC) %s\n", $$1, $$2}'
+	@echo -e "$(CYAN)$(BOLD)Automated High-Level Workflows:$(NC)"
+	@echo -e "  $(GREEN)make setup$(NC)              # 1-Click Bootstrap: build, boot, migrate, seed, and sync SDK"
+	@echo -e "  $(GREEN)make dev$(NC)                # Developer Mode: boot mesh, apply migrations, sync SDK & tail logs"
+	@echo -e "  $(GREEN)make check$(NC)              # Full QA Gate: lint, format, pytest 80/80, zero-drift, frontend build"
+	@echo -e "  $(GREEN)make reset$(NC)              # Complete Clean Reset: wipe volumes, rebuild images, migrate & reseed"
+	@echo -e "  $(GREEN)make prod$(NC)               # Production Launch: boot stack with Cloudflare tunnel & trusted proxy"
 	@echo -e ""
-	@echo -e "$(YELLOW)Common Workflows:$(NC)"
-	@echo -e "  make up                           # Boot full container mesh in background (Podman default)"
-	@echo -e "  make up-dev                       # Boot container mesh with forced image rebuild"
-	@echo -e "  make logs SERVICE=app             # Tail live logs for a specific service"
-	@echo -e "  make worker                       # Start or ensure SAQ background worker is running"
-	@echo -e "  make worker-logs                  # Tail live logs from SAQ background worker"
-	@echo -e "  make metrics                      # Inspect Prometheus scrapable metrics endpoint"
-	@echo -e "  make outbox-relay                 # Trigger a sweep of pending transactional outbox events"
-	@echo -e "  make dlq-replay                   # Replay quarantined Dead Letter Queue events"
-	@echo -e "  make tunnel-status                # Check Cloudflare Zero Trust Tunnel container status"
-	@echo -e "  make tunnel-logs                  # Tail live logs from Cloudflare Tunnel container"
-	@echo -e "  make migrate                      # Run Alembic migrations inside app container"
-	@echo -e "  make seed                         # Seed initial superuser into database"
-	@echo -e "  make test                         # Run isolated pytest suite inside container"
-	@echo -e "  make db-backup                    # Dump timestamped compressed PostgreSQL backup"
-	@echo -e "  CONTAINER_ENGINE=docker make up   # Override runtime engine to Docker on demand"
+	@echo -e "$(YELLOW)$(BOLD)All Individual Targets:$(NC)"
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-22s$(NC) %s\n", $$1, $$2}'
 	@echo -e ""
+
+# ------------------------------------------------------------------------------
+# High-Level Automated Workflows (Compound Super-Targets)
+# ------------------------------------------------------------------------------
+.PHONY: setup bootstrap
+setup: bootstrap ## 1-Click Zero-Config Bootstrap: build, boot, migrate, seed superadmin, and sync SDK
+bootstrap:
+	@echo -e "$(BLUE)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@echo -e "$(BLUE)$(BOLD)🚀 Launching Automated Platform Bootstrap via $(CONTAINER_ENGINE)...$(NC)"
+	@echo -e "$(BLUE)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@if [ ! -f .env ]; then \
+		echo -e "$(YELLOW)Creating .env from .env.example with secure defaults...$(NC)"; \
+		cp .env.example .env; \
+	fi
+	@echo -e "$(BLUE)Step 1/6: Building container images...$(NC)"
+	@$(MAKE) build
+	@echo -e "$(BLUE)Step 2/6: Starting core container mesh in background...$(NC)"
+	@$(MAKE) up
+	@echo -e "$(BLUE)Step 3/6: Waiting for PostgreSQL & Valkey readiness...$(NC)"
+	@for i in {1..30}; do \
+		if $(EXEC_DB) pg_isready -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "app_user") -d $$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo "app_db") >/dev/null 2>&1; then \
+			echo -e "$(GREEN)✅ PostgreSQL is accepting connections$(NC)"; \
+			break; \
+		fi; \
+		echo -e "$(YELLOW)Waiting for database (attempt $$i/30)...$(NC)"; \
+		sleep 1; \
+	done
+	@echo -e "$(BLUE)Step 4/6: Applying database migrations...$(NC)"
+	@$(MAKE) migrate
+	@echo -e "$(BLUE)Step 5/6: Seeding initial superuser account...$(NC)"
+	@$(MAKE) seed
+	@echo -e "$(BLUE)Step 6/6: Synchronizing OpenAPI schema and TypeScript frontend client SDK...$(NC)"
+	@$(MAKE) frontend-sync
+	@echo -e ""
+	@echo -e "$(GREEN)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@echo -e "$(GREEN)$(BOLD)🎉 Platform Bootstrap Complete & Fully Operational!$(NC)"
+	@echo -e "$(GREEN)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
+	@echo -e "  $(CYAN)• API & Docs UI:$(NC)    http://localhost:8000/docs"
+	@echo -e "  $(CYAN)• Prometheus:$(NC)       http://localhost:8000/metrics"
+	@echo -e "  $(CYAN)• Health Probes:$(NC)    http://localhost:8000/health/ready"
+	@echo -e "  $(CYAN)• Superadmin Email:$(NC) $$(grep FIRST_SUPERUSER_EMAIL .env | cut -d= -f2 2>/dev/null || echo 'admin@platform.internal')"
+	@echo -e "  $(CYAN)• Tail live logs:$(NC)   make logs"
+	@echo -e ""
+
+.PHONY: dev
+dev: ## Daily Developer Mode: start mesh, apply migrations, sync SDK, and stream logs
+	@echo -e "$(BLUE)Starting developer mode with $(CONTAINER_ENGINE)...$(NC)"
+	@$(MAKE) up
+	@$(MAKE) migrate
+	@$(MAKE) frontend-sync
+	@$(MAKE) logs
+
+.PHONY: check verify
+check: verify ## Run full automated QA verification suite (lint, pytest, zero-drift, frontend build)
+verify:
+	@echo -e "$(BLUE)$(BOLD)Running full automated QA verification gate...$(NC)"
+	@$(MAKE) lint
+	@$(MAKE) test
+	@$(MAKE) check-client-drift
+	@$(MAKE) frontend-build
+	@echo -e "$(GREEN)$(BOLD)✅ All QA checks passed cleanly! Zero errors, zero schema drift.$(NC)"
+
+.PHONY: reset
+reset: ## Complete clean reset: wipe volumes, rebuild images, migrate & reseed
+	@echo -e "$(RED)$(BOLD)⚠️  CAUTION: This will destroy all database volumes and recreate the environment.$(NC)"
+	@read -p "Are you sure you want to proceed with full reset? [y/N] " -n 1 -r; \
+	echo ""; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		$(MAKE) down-volumes; \
+		$(MAKE) setup; \
+	else \
+		echo -e "$(YELLOW)Reset aborted by user.$(NC)"; \
+	fi
+
+.PHONY: prod
+prod: prod-up ## Production Stack Launch: start all services with Cloudflare tunnel
 
 # ------------------------------------------------------------------------------
 # Stack Lifecycle Management
@@ -256,7 +325,7 @@ seed: ## Seed initial platform superuser from environment settings
 
 .PHONY: db-shell
 db-shell: ## Open direct interactive psql console on running PostgreSQL container
-	@$(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d $$(grep POSTGRES_DB .env | cut -d= -f2)
+	@$(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "app_user") -d $$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo "app_db")
 
 # ------------------------------------------------------------------------------
 # Transactional Outbox & DLQ Operations
@@ -282,7 +351,7 @@ outbox-status: ## Check counts of pending outbox and dead letter events
 db-backup: ## Dump compressed PostgreSQL custom-format archive into backups/
 	@mkdir -p backups
 	@echo -e "$(YELLOW)Extracting compressed PostgreSQL backup...$(NC)"
-	@$(EXEC_DB) pg_dump -U $$(grep POSTGRES_USER .env | cut -d= -f2) $$(grep POSTGRES_DB .env | cut -d= -f2) | gzip -9 > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql.gz
+	@$(EXEC_DB) pg_dump -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "app_user") $$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo "app_db") | gzip -9 > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql.gz
 	@echo -e "$(GREEN)✅ Backup saved to backups/$(NC)"
 
 .PHONY: db-backup-verify
@@ -304,13 +373,13 @@ db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups
 		echo -e "$(RED)❌ DB is required.$(NC) Specify target database (e.g., DB=app_restore or DB=app_db)"; \
 		exit 1; \
 	fi
-	@if [ "$(DB)" = "$$(grep POSTGRES_DB .env | cut -d= -f2)" ] && [ "$(CONFIRM_LIVE_RESTORE)" != "YES" ]; then \
+	@if [ "$(DB)" = "$$(grep POSTGRES_DB .env | cut -d= -f2 2>/dev/null || echo 'app_db')" ] && [ "$(CONFIRM_LIVE_RESTORE)" != "YES" ]; then \
 		echo -e "$(RED)❌ Refusing direct restore over live database without explicit confirmation.$(NC)"; \
 		echo -e "$(YELLOW)Pass CONFIRM_LIVE_RESTORE=YES or restore to an alternate database first.$(NC)"; \
 		exit 1; \
 	fi
 	@echo -e "$(YELLOW)Restoring $(FILE) into $(DB)...$(NC)"
-	@gzip -dc "$(FILE)" | $(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d "$(DB)"
+	@gzip -dc "$(FILE)" | $(EXEC_DB) psql -U $$(grep POSTGRES_USER .env | cut -d= -f2 2>/dev/null || echo "app_user") -d "$(DB)"
 	@echo -e "$(GREEN)✅ Database restored$(NC)"
 
 # ------------------------------------------------------------------------------

@@ -198,3 +198,29 @@ first_superuser_password:
   type: str
   help: "Initial superuser login password (auto-generated)"
   default: "Admin!{{ 9999999999999999 | random | string | hash('sha256') | truncate(16, True, '') }}"
+
+# ------------------------------------------------------------------------------
+# Git Initialization & Automated Stack Bootstrap
+# ------------------------------------------------------------------------------
+init_git:
+  type: bool
+  help: "Initialize a fresh Git repository in the generated project directory?"
+  default: true
+
+auto_launch:
+  type: bool
+  help: "Automatically build, start container mesh, run migrations, seed superadmin, and sync SDK immediately after generation?"
+  default: true
+
+# ------------------------------------------------------------------------------
+# Post-Generation Lifecycle Tasks
+# ------------------------------------------------------------------------------
+_tasks:
+  - >-
+    {% if init_git %}
+    git init -b main && git add . && git commit -m "feat(init): scaffold enterprise platform from LiteForge template" || true
+    {% endif %}
+  - >-
+    {% if auto_launch %}
+    make setup || true
+    {% endif %}
