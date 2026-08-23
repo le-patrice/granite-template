@@ -57,14 +57,14 @@ pipx install copier   # or: uv tool install copier
 ### 2. Generate Your Project
 Run Copier directly against the Git repository URL:
 ```bash
-copier copy gh:le-patrice/granite-stack my-new-service
+copier copy https://github.com/le-patrice/granite-template my-project --trust
 ```
 Follow the interactive CLI prompts to select your project name, target ports, and optional infrastructure layers (TimescaleDB, pgvector, Valkey, PgBouncer, Cloudflare Tunnels, Frontend).
 
 ### 3. Start the Stack (Podman Default)
 Navigate into your generated project and launch the container mesh:
 ```bash
-cd my-new-service
+cd my-project
 
 # 1. Boot all core mesh services in background
 make up
