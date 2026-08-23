@@ -126,6 +126,15 @@ Thumbs.db
 *.sublime-project
 
 # ------------------------------------------------------------------------------
+# Internal Architectural Research & Proprietary Blueprints
+# ------------------------------------------------------------------------------
+DOMAIN_BLUEPRINT.md
+**/DOMAIN_BLUEPRINT.md
+docs/internal/
+docs/research/
+*.draft.md
+
+# ------------------------------------------------------------------------------
 # Reference Manuals & Internal Scaffolding Artifacts
 # ------------------------------------------------------------------------------
 references/
@@ -135,3 +144,4 @@ PROJECT_IMPLEMENTATION_MANUAL.md
 *project_implemenation*
 project_implementation*
 project_implemenation*
+

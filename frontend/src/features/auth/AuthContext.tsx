@@ -70,8 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem("access_token", accessToken);
         setToken(accessToken);
         await refreshProfile();
+      } else if (res.error) {
+        throw res.error;
       } else {
-        throw new Error(res.error ? String(res.error) : "Invalid credentials.");
+        throw new Error("Incorrect email or password. Please verify your credentials and try again.");
       }
     } finally {
       setIsLoading(false);

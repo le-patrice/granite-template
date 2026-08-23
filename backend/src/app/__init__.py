@@ -56,24 +56,34 @@ async def init_admin_user() -> None:
         from app.core.security import get_password_hash
         from app.domain.users.models import User
 
+        email = settings.FIRST_SUPERUSER_EMAIL
+        password = settings.FIRST_SUPERUSER_PASSWORD
+
+        if not email or not password:
+            logger.warning(
+                "superuser_startup_seed_skipped",
+                reason="FIRST_SUPERUSER_EMAIL or FIRST_SUPERUSER_PASSWORD not configured",
+            )
+            return
+
         engine = create_async_engine(settings.DATABASE_URL)
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
         async with session_factory() as session:
             repo = PostgresUserRepository(session=session)
-            existing = await repo.get_by_email(settings.FIRST_SUPERUSER_EMAIL)
+            existing = await repo.get_by_email(email)
             if not existing:
                 superuser = User(
-                    email=settings.FIRST_SUPERUSER_EMAIL,
-                    hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+                    email=email,
+                    hashed_password=get_password_hash(password),
                     full_name=settings.FIRST_SUPERUSER_NAME,
                     is_superuser=True,
                     is_active=True,
                 )
                 await repo.add(superuser)
                 await session.commit()
-                logger.info("superuser_seeded_at_startup", email=settings.FIRST_SUPERUSER_EMAIL)
+                logger.info("superuser_seeded_at_startup", email=email)
         await engine.dispose()
-    except (OSError, RuntimeError) as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.warning("superuser_startup_seed_deferred", error=str(exc))
 
 

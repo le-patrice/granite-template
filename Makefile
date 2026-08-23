@@ -23,15 +23,17 @@ NC     := \033[0m # No Color
 CONTAINER_ENGINE ?= podman
 COMPOSE_FILE     ?= -f config/podman-compose.yml
 ENV_FILE         ?= --env-file .env
+PROJECT_NAME     ?= $(shell grep -E '^COMPOSE_PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 | tr -d ' "' || echo "enterprise")
 
 # Socket context for rootless Podman execution
 export CONTAINER_HOST ?= unix:///run/user/$(shell id -u)/podman/podman.sock
 
 # Execution wrappers
 COMPOSE_BASE  := $(CONTAINER_ENGINE) compose $(COMPOSE_FILE)
-EXEC_APP      := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i backend
-EXEC_DB       := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i postgres_db
-EXEC_FRONTEND := $(COMPOSE_BASE) exec -T frontend 2>/dev/null || $(CONTAINER_ENGINE) exec -i frontend_dev
+EXEC_APP      := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i $(PROJECT_NAME)_backend
+EXEC_DB       := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i $(PROJECT_NAME)_postgres
+EXEC_FRONTEND := $(COMPOSE_BASE) exec -T frontend 2>/dev/null || $(CONTAINER_ENGINE) exec -i $(PROJECT_NAME)_frontend
+
 
 # Command argument overrides
 SERVICE ?= app

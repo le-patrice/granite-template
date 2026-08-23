@@ -16,9 +16,11 @@
 #                             └─ /*                      → frontend:5173
 # ===========================================================================
 
+name: ${COMPOSE_PROJECT_NAME:-enterprise}
+
 networks:
   platform_net:
-    name: platform_net
+    name: ${COMPOSE_PROJECT_NAME:-enterprise}_net
     driver: bridge
 
 services:
@@ -26,7 +28,7 @@ services:
   # ── PgBouncer Connection Pooler (Transaction Pooling Gateway) ──────────────
   pgbouncer:
     image: docker.io/edoburu/pgbouncer:latest
-    container_name: pgbouncer_pool
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_pgbouncer
     restart: unless-stopped
     expose:
       - "6432"
@@ -49,7 +51,7 @@ services:
   # ── Traefik reverse proxy ──────────────────────────────────────────────────
   traefik:
     image: docker.io/traefik:v3.3
-    container_name: traefik
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_traefik
     restart: unless-stopped
     ports:
       - "${PORT:-8000}:80"      # public HTTP / h2c entrypoint
@@ -63,7 +65,7 @@ services:
       - "--providers.file.filename=/etc/traefik/traefik-dev.yml"
       - "--providers.docker.endpoint=unix:///run/podman/podman.sock"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=platform_net"
+      - "--providers.docker.network=${COMPOSE_PROJECT_NAME:-enterprise}_net"
       - "--entrypoints.web.address=:80"
       - "--log.level=INFO"
       - "--log.format=json"
@@ -79,7 +81,7 @@ services:
   # ── Cloudflare Zero Trust Tunnel ───────────────────────────────────────────
   cloudflared:
     image: docker.io/cloudflare/cloudflared:latest
-    container_name: cloudflared_tunnel
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_cloudflared
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
@@ -95,7 +97,7 @@ services:
   # ── Mailpit Mock SMTP Server (Development Email Inspection) ────────────────
   mailpit:
     image: docker.io/axllent/mailpit:latest
-    container_name: mailpit
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_mailpit
     restart: unless-stopped
     ports:
       - "1025:1025"      # SMTP ingress
@@ -108,7 +110,7 @@ services:
     build:
       context: ../backend
       dockerfile: ../config/Containerfile
-    container_name: backend
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_backend
     restart: unless-stopped
     # No host-port binding — all traffic comes through Traefik
     expose:
@@ -159,7 +161,7 @@ services:
     build:
       context: ../backend
       dockerfile: ../config/Containerfile
-    container_name: worker_app
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_worker
     restart: unless-stopped
     command: ["python", "-m", "saq", "app.core.worker.settings", "--workers", "4"]
     environment:
@@ -190,7 +192,7 @@ services:
   # ── Vite frontend dev-server ───────────────────────────────────────────────
   frontend:
     image: docker.io/library/node:22-alpine
-    container_name: frontend_dev
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_frontend
     working_dir: /app
     volumes:
       - ../frontend:/app:z
@@ -200,6 +202,8 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_API_URL=
+      - VITE_INITIAL_ADMIN_EMAIL=${FIRST_SUPERUSER_EMAIL:-admin@platform.internal}
+      - VITE_INITIAL_ADMIN_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-AdminSecurePassword2026!}
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     networks:
       - platform_net
@@ -210,7 +214,7 @@ services:
   # ── TimescaleDB + pgvector ─────────────────────────────────────────────────
   postgres-db:
     image: docker.io/timescale/timescaledb-ha:pg16
-    container_name: postgres_db
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_postgres
     restart: unless-stopped
     environment:
       - PGDATA=/var/lib/postgresql/data
@@ -233,7 +237,7 @@ services:
   # ── Valkey ────────────────────────────────────────────────────────────────
   valkey-cache:
     image: docker.io/valkey/valkey:8-alpine
-    container_name: valkey_cache
+    container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_valkey
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -244,8 +248,9 @@ services:
 
 volumes:
   postgres_data:
-    name: config_postgres_data
+    name: ${COMPOSE_PROJECT_NAME:-enterprise}_postgres_data
   valkey_data:
-    name: config_valkey_data
+    name: ${COMPOSE_PROJECT_NAME:-enterprise}_valkey_data
   frontend_node_modules:
-    name: config_frontend_node_modules
+    name: ${COMPOSE_PROJECT_NAME:-enterprise}_frontend_node_modules
+
