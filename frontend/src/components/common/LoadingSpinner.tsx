@@ -7,9 +7,11 @@ export const LoadingSpinner: React.FC<{ className?: string; label?: string }> = 
   label = "Loading...",
 }) => {
   return (
-    <div className={cn("flex flex-col items-center justify-center p-8 text-slate-400", className)}>
-      <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-2" />
+    <div className={cn("flex flex-col items-center justify-center p-8 text-muted-foreground", className)}>
+      <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
       <span className="text-xs">{label}</span>
     </div>
   );
 };
+
+export default LoadingSpinner;

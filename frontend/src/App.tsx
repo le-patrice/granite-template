@@ -19,7 +19,7 @@ const AuthenticatedApp: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <LoadingSpinner label="Authenticating platform session..." />
       </div>
     );
@@ -50,8 +50,8 @@ const AuthenticatedApp: React.FC = () => {
       {currentTab === "telemetry" && (
         <div className="space-y-6 max-w-4xl">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-100">Telemetry & TimescaleDB</h1>
-            <p className="text-xs text-slate-400 mt-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Telemetry & TimescaleDB</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Time-series hypertables with hyper-scale compression and automated retention policies.
             </p>
           </div>

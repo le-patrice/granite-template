@@ -1,121 +1,99 @@
-# Litestar Project - Backend
+# Backend Service
 
-The backend is built with [Litestar](https://litestar.dev/), [Granian](https://github.com/emmett-framework/granian) (Rust ASGI server), [Advanced Alchemy](https://docs.advanced-alchemy.litestar.dev/) / [SQLAlchemy 2.0](https://www.sqlalchemy.org), [Pydantic v2](https://docs.pydantic.dev), [TimescaleDB](https://www.timescale.com), [pgvector](https://github.com/pgvector/pgvector), [Valkey](https://valkey.io), and [SAQ](https://github.com/tobymao/saq) background workers.
+High-performance ASGI API built with Litestar 2.x, SQLAlchemy 2.0, TimescaleDB, and Valkey.
 
-## Requirements
+<p align="center">
+  <img src="../docs/assets/scalar-preview.png" alt="Backend Scalar OpenAPI Documentation" width="100%"/>
+</p>
 
-* [Podman](https://podman.io/) or [Docker](https://www.docker.com/).
-* Python 3.11+ (managed containerized or locally via `uv` / `venv`).
+---
 
-## Local Development with Podman / Docker
+## Internal Structure
 
-Run the entire backend stack containerized with live code reloading via Granian:
+The backend is organized according to clean modular architecture principles:
 
-```console
-$ make up
+```text
+src/app/
+├── core/           # Configuration, rate limiting, OpenAPI plugins, security, exception handling
+├── domain/         # Clean architecture domain models, schemas, and business services
+├── adapters/       # Cache, database session factories, transactional outbox, external integrations
+└── presentation/   # Litestar API route controllers, guards, and middleware
 ```
 
-The API is immediately available at `http://localhost:8000`, with automatic interactive OpenAPI documentation at:
-- **Swagger UI:** `http://localhost:8000/docs/swagger`
-- **Scalar UI:** `http://localhost:8000/docs/scalar`
-- **OpenAPI 3.1 Schema:** `http://localhost:8000/docs/openapi.json`
+### Module Responsibilities
 
-## Granian ASGI Server Configuration
+* **`core/`**: Application configuration, logging formatters, JWT token security, multi-engine OpenAPI documentation plugins (Scalar, Swagger UI, ReDoc, Stoplight Elements, RapiDoc), and atomic Valkey sliding-window rate limiters.
+* **`domain/`**: Entity models (User, Items, Telemetry, Audit Logs), business validation schemas (msgspec/Pydantic), and domain service contracts.
+* **`adapters/`**: Database engine setup (SQLAlchemy 2.0 async engine + PgBouncer compatibility), Valkey caching layer, SAQ worker queue adapters, and TimescaleDB hypertable audit CDC listeners.
+* **`presentation/`**: Controller endpoints (`/api/v1/auth`, `/api/v1/users`, `/api/v1/telemetry`, `/health`), authentication guards, and request lifecycle hooks.
 
-The backend is served by **Granian**, an ultra-high performance HTTP server written in Rust:
+---
 
-* **Development:** Starts with `--reload` mounted on `/app/src` for instant hot-reloading upon file changes.
-* **Production:** Configured for multiple Rust workers, cleartext HTTP/2 (`h2c`), and optimal async event loop threading:
+## Database & Migrations Guide
+
+The application utilizes **PostgreSQL 16** with **TimescaleDB** extensions and **PgBouncer** connection pooling. Database migrations are managed via **Alembic**.
+
+### Creating Migrations
+
+To generate a new auto-detected migration after modifying SQLAlchemy models:
+
+```bash
+# Create a new migration revision inside the container
+make exec-db CMD="alembic revision --autogenerate -m 'add_entity_table'"
+```
+
+### Applying Migrations
+
+To run all pending migrations up to the `head` revision and seed initial administrator credentials:
+
+```bash
+# Apply pending schema migrations
+make migrate
+```
+
+### Manual Rollback & Downgrade
+
+```bash
+# Downgrade one revision step
+make exec-db CMD="alembic downgrade -1"
+```
+
+---
+
+## OpenAPI Schema Export & Client Generation
+
+The backend provides a deterministic schema export utility:
+
+* **Export Script:** [`scripts/export_schemas.py`](file:///home/pat/Business/LiteStar/backend/scripts/export_schemas.py) instantiates the Litestar application in headless mode, exports the OpenAPI 3.1 specification, and formats the output JSON deterministically (`sort_keys=True`, 2-space indentation).
+* **Execution:**
   ```bash
-  granian --interface asgi app:app --host 0.0.0.0 --port 8000 --workers 4 --http 1 --opt
+  # Export schema and synchronize frontend TypeScript SDK
+  make frontend-sync
   ```
 
-## General Workflow
+---
 
-The backend follows Clean Architecture principles:
+## Testing & Quality Assurance
 
-* **Domain Entities & Models:** Defined in `backend/src/app/domain/<domain>/models.py` using Advanced Alchemy / SQLAlchemy 2.0 Declarative Mapped classes.
-* **DTO Schemas:** Defined in `backend/src/app/domain/<domain>/schemas.py` using Pydantic v2 / msgspec Structs.
-* **Repository Contracts & Adapters:** Interface contracts in `backend/src/app/domain/<domain>/contracts.py` and Postgres implementations in `backend/src/app/adapters/postgres/`.
-* **Controllers & Routing:** Litestar controllers in `backend/src/app/presentation/api/v1/` registered in `backend/src/app/presentation/api/router.py`.
+All linters and test suites execute within the container environment to ensure zero host environment discrepancy:
 
-## Database Migrations (Alembic)
+```bash
+# Run Ruff linting and formatting checks
+make lint
 
-Database schema migrations are managed via Alembic against PostgreSQL / TimescaleDB:
+# Run Pytest suite with async event loop verification (80+ unit and integration tests)
+make test
 
-* **Apply pending migrations:**
-  ```console
-  $ make migrate
-  ```
-
-* **Generate a new autodetected migration revision:**
-  ```console
-  $ make migration-create MSG="add_orders_table"
-  ```
-
-* **Rollback one migration revision (-1):**
-  ```console
-  $ make migrate-down
-  ```
-
-* **Inspect migration history:**
-  ```console
-  $ make migrate-history
-  ```
-
-* **Direct database shell (`psql`):**
-  ```console
-  $ make db-shell
-  ```
-
-## Backend Tests
-
-The backend test suite runs inside the container using isolated transactional database sessions to prevent test pollution:
-
-```console
-$ make test
+# Run full QA gate (lint + test + schema drift check + build)
+make check
 ```
 
-To run a specific test file or test pattern:
-```console
-$ make test TEST="tests/api/test_auth_and_users.py -k test_login"
-```
+---
 
-To run Ruff linter and code formatting validation:
-```console
-$ make lint
-```
+## Key Resilience & Performance Features
 
-## OpenAPI Schema Export & Frontend Client Sync
-
-Whenever API route handlers, parameters, or schema models change, synchronize the typed client SDK for the frontend:
-
-```console
-# Export backend OpenAPI schema to frontend/openapi.json and compile TypeScript client SDK
-$ make frontend-sync
-
-# Verify zero drift between backend schema and client SDK
-$ make check-client-drift
-```
-
-## Background Task Processing (SAQ) & Transactional Outbox
-
-* **Start SAQ worker process:**
-  ```console
-  $ make worker
-  ```
-
-* **Tail live worker logs:**
-  ```console
-  $ make worker-logs
-  ```
-
-* **Sweep pending Transactional Outbox events:**
-  ```console
-  $ make outbox-relay
-  ```
-
-* **Replay Dead Letter Queue (DLQ) events:**
-  ```console
-  $ make dlq-replay
-  ```
+1. **Granian ASGI Server:** Powered by Rust-based Granian with 4 worker processes and non-blocking asynchronous I/O.
+2. **PgBouncer Multiplexing:** Transaction-level connection pooling eliminating PostgreSQL backend process exhaustion.
+3. **Sliding-Window Rate Limiting:** High-frequency rate limiting implemented directly via atomic Valkey Lua scripts.
+4. **Resilient Background Tasks:** Asynchronous task processing with automated retries and dead-letter queues via [SAQ](https://github.com/tobymao/saq).
+5. **Row-Level Security (RLS):** Automated transaction-scoped PostgreSQL session context (`app.current_user_id`, `app.current_tenant_id`) enforcing clean isolation.

@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Logo } from "@/components/common/Logo";
-import { Appearance } from "@/components/common/Appearance";
+import { SidebarAppearance } from "@/components/common/Appearance";
 
 export type NavItem = "dashboard" | "users" | "telemetry" | "settings";
 
@@ -55,10 +55,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const getInitials = (name: string) => {
     return name
       .split(" ")
+      .slice(0, 2)
       .map((part) => part[0])
       .join("")
-      .toUpperCase()
-      .slice(0, 2);
+      .toUpperCase();
   };
 
   return (
@@ -86,8 +86,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                !isOpen && "justify-center px-0"
               )}
+              title={item.label}
             >
               <span className={cn(isActive ? "text-primary" : "text-muted-foreground")}>
                 {item.icon}
@@ -103,9 +105,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             href="/docs"
             target="_blank"
             rel="noreferrer"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors",
+              !isOpen && "justify-center px-0"
+            )}
+            title="OpenAPI Docs (/docs)"
           >
-            <FileCode2 className="h-4 w-4" />
+            <FileCode2 className="h-4 w-4 shrink-0" />
             {isOpen && <span>OpenAPI Docs (/docs)</span>}
           </a>
         </div>
@@ -113,16 +119,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Footer */}
       <div className="border-t border-sidebar-border p-3 space-y-2">
-        <div className="flex items-center justify-between px-1">
-          {isOpen && <span className="text-xs text-muted-foreground">Theme</span>}
-          <Appearance />
-        </div>
+        {/* Appearance Toggle */}
+        <SidebarAppearance isOpen={isOpen} />
 
-        {/* User Account Menu */}
-        <div className="relative" ref={userMenuRef}>
+        {/* User Account Menu with Side Dropoff */}
+        <div className="relative w-full" ref={userMenuRef}>
           <button
+            type="button"
             onClick={() => setUserMenuOpen((prev) => !prev)}
-            className="flex w-full items-center justify-between rounded-lg p-2 hover:bg-sidebar-accent text-sidebar-foreground transition-colors text-left"
+            className={cn(
+              "flex w-full items-center justify-between rounded-lg p-2 hover:bg-sidebar-accent text-sidebar-foreground transition-colors text-left",
+              !isOpen && "justify-center p-1.5"
+            )}
+            title={user?.full_name || user?.email || "User account"}
+            aria-label="User account menu"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-semibold">
@@ -130,10 +140,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               {isOpen && (
                 <div className="flex flex-col truncate min-w-0">
-                  <span className="text-xs font-medium truncate">
+                  <span className="text-xs font-medium truncate text-foreground">
                     {user?.full_name || "User"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground truncate">
+                  <span className="text-[10px] text-muted-foreground truncate font-mono">
                     {user?.email}
                   </span>
                 </div>
@@ -142,27 +152,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isOpen && <ChevronsUpDown className="h-4 w-4 text-muted-foreground shrink-0" />}
           </button>
 
+          {/* User Popover with Clean Opacity & Side Dropoff */}
           {userMenuOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-full rounded-lg border border-border bg-popover p-1 shadow-xl z-50">
+            <div
+              className={cn(
+                "absolute z-50 min-w-56 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xs animate-in fade-in-0 zoom-in-95 duration-100",
+                isOpen
+                  ? "bottom-full left-0 mb-2 w-full"
+                  : "left-full bottom-0 ml-2 w-56"
+              )}
+            >
+              {/* User Summary Header */}
+              <div className="flex items-center gap-2.5 p-2 rounded-md bg-muted/40">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary text-xs font-semibold">
+                  {getInitials(user?.full_name || user?.email || "User")}
+                </div>
+                <div className="flex flex-col truncate min-w-0">
+                  <span className="text-xs font-medium truncate text-foreground">
+                    {user?.full_name || "User"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground truncate font-mono">
+                    {user?.email}
+                  </span>
+                </div>
+              </div>
+
+              <div className="my-1 border-t border-border" />
+
+              {/* Navigation to User Settings */}
               <button
+                type="button"
                 onClick={() => {
                   setUserMenuOpen(false);
                   onSelectTab("settings");
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-popover-foreground hover:bg-accent transition-colors text-left"
+                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-xs text-foreground hover:bg-accent transition-colors text-left font-medium"
               >
-                <Settings className="h-3.5 w-3.5" />
+                <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                 User Settings
               </button>
+
               <div className="my-1 border-t border-border" />
+
+              {/* Log Out Action */}
               <button
+                type="button"
                 onClick={() => {
                   setUserMenuOpen(false);
                   logout();
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors text-left"
+                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors text-left font-medium"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <LogOut className="h-3.5 w-3.5 text-destructive" />
                 Log Out
               </button>
             </div>
@@ -172,3 +213,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+
+export default Sidebar;

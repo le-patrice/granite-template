@@ -49,8 +49,10 @@ export const UsersDataTable: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Users Management</h1>
-          <p className="text-xs text-muted-foreground mt-1">Manage user accounts, RBAC permissions, and roles</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">User Governance</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage system administrators, provision accounts, and govern role-based access.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button

@@ -27,13 +27,13 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-slate-100">
-          <div className="max-w-md w-full rounded-xl border border-red-500/20 bg-slate-900/80 p-6 text-center shadow-xl">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400 mb-4">
+        <div className="min-h-screen flex items-center justify-center p-6 bg-background text-foreground">
+          <div className="max-w-md w-full rounded-xl border border-destructive/30 bg-card p-6 text-center shadow-xl">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive mb-4">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <h2 className="text-lg font-semibold">Application Runtime Exception</h2>
-            <p className="mt-2 text-xs text-slate-400">
+            <h2 className="text-lg font-semibold text-card-foreground">Application Runtime Exception</h2>
+            <p className="mt-2 text-xs text-muted-foreground">
               {this.state.error?.message || "An unexpected rendering error occurred."}
             </p>
             <div className="mt-6 flex justify-center">
@@ -55,3 +55,5 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+export default ErrorBoundary;

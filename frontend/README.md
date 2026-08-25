@@ -1,125 +1,99 @@
-# Litestar Project - Frontend
+# Frontend Application
 
-The frontend is built with [React 18](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vitejs.dev/), [Tailwind CSS](https://tailwindcss.com/), [shadcn/ui](https://ui.shadcn.com/) patterns, and [@hey-api/client-fetch](https://heyapi.dev/).
+<p align="center">
+  <img src="../docs/assets/dashboard-preview.png" alt="Frontend UI Preview" width="100%"/>
+</p>
 
-## Requirements
+Single Page Application built on React 18, Vite, TypeScript, and Tailwind CSS.
 
-* [Node.js](https://nodejs.org/) (version 20+) or containerized execution via [Podman](https://podman.io/) / [Docker](https://www.docker.com/).
+---
 
-## Quick Start
+## Visual Tour
 
-### Option 1: Full-Stack Container Mesh (Recommended)
+<p align="center">
+  <img src="../docs/assets/login-preview.png" alt="Login and Form Validation UI" width="48%"/>
+  <img src="../docs/assets/users-table-preview.png" alt="User Governance Table" width="48%"/>
+</p>
 
-From the project root directory, start the entire container stack:
+---
+
+## Design Tokens & Theme System
+
+The user interface implements 1:1 visual parity with the official FastAPI Full-Stack Template design system:
+
+### Color Palette & Tokens
+
+* **Primary Teal Token:**
+  * **Light Mode:** `hsl(174, 85%, 35%)`
+  * **Dark Mode:** `hsl(174, 85%, 42%)`
+* **Destructive / Error Token:**
+  * `hsl(0, 84%, 60%)` / `rgb(239, 68, 68)`
+* **Surface Tokens:**
+  * `bg-background`, `bg-card`, `bg-popover`, `bg-muted`, `border-border`
+
+### Theme Switching (`useTheme`)
+
+Themes are persisted in `localStorage` and managed reactively via [`hooks/useTheme.tsx`](file:///home/pat/Business/LiteStar/frontend/src/hooks/useTheme.tsx), applying the `.dark` CSS class to the root document element.
+
+### Reactive Error Styling & Form Validation
+
+* **Sharp Error Outlines:** Failing input validation transitions the border to `border-destructive` with an active `focus-visible:ring-destructive/20` focus ring.
+* **Inline Error Microcopy:** Clear, left-aligned error messages (`text-xs text-destructive font-normal mt-1`) rendered directly under the invalid field.
+* **Reactive Clearing:** Error borders and helper messages clear immediately as the user edits the input.
+* **Accessible Semantics:** Form controls receive `aria-invalid="true"` and `aria-describedby="{id}-error"` when invalid.
+
+---
+
+## Client SDK Generation Workflow
+
+The frontend features an automated OpenAPI-to-TypeScript SDK generation pipeline powered by `@hey-api/openapi-ts`:
 
 ```bash
-make up
-```
-
-The frontend SPA is immediately available at `http://localhost:8000/` with hot module replacement (HMR) reverse-proxied through Traefik.
-
-### Option 2: Local Vite Development Server
-
-Run the frontend locally against a running backend instance:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Then open `http://localhost:5173/` in your browser.
-
-## Generating the TypeScript Client
-
-The frontend client SDK is automatically compiled from the backend's OpenAPI 3.1 schema using `@hey-api/openapi-ts`.
-
-### Automatically via Makefile
-
-From the repository root directory, run:
-
-```bash
+# 1. Export latest OpenAPI schema from backend and regenerate typed TypeScript client
 make frontend-sync
-```
 
-This exports the latest OpenAPI specification to `frontend/openapi.json` and regenerates all typed bindings in `frontend/src/client/`.
-
-### Verifying Zero Schema Drift
-
-To ensure frontend bindings are always synchronized in CI/CD quality gates:
-
-```bash
-make check-client-drift
-```
-
-### Manual Generation
-
-From the `frontend/` directory:
-
-```bash
-npm run generate-client
-```
-
-## Production Build
-
-To test and compile the production bundle:
-
-```bash
-# Via root Makefile
+# 2. Run TypeScript compilation check and create production build
 make frontend-build
-
-# Or directly from frontend/
-cd frontend
-npm run build
 ```
 
-Production build output is emitted to `frontend/dist/`.
+### Generated Client Usage Example
 
-## Tailwind CSS & Theme Configuration
+```typescript
+import { apiV1UsersListUsers } from "@/client/sdk.gen";
 
-* **Theme Switching:** Supports dark mode, light mode, and system preference via `frontend/src/hooks/useTheme.tsx`.
-* **Theme Variables:** Modern CSS variables defined in `frontend/src/index.css` following shadcn/ui palette standards (primary, secondary, destructive, muted, accent, background, foreground).
-* **Utility Styling:** Tailwind CSS configured in `frontend/tailwind.config.js` with `tailwindcss-animate` and CSS variables integration.
+// Fully typed asynchronous request with type completion
+const response = await apiV1UsersListUsers({
+  query: { skip: 0, limit: 100 },
+});
 
-## Environment Variables & Remote API
-
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `VITE_API_URL` | Base URL for remote backend API (leave empty for same-origin proxying) | `""` |
-| `VITE_INITIAL_ADMIN_EMAIL` | Default email populated in the development login form | `admin@platform.internal` |
-| `VITE_INITIAL_ADMIN_PASSWORD` | Default password populated in the development login form | `AdminSecurePassword2026!` |
-
-To connect to a remote backend API during local Vite development:
-
-```env
-VITE_API_URL=https://api.platform.example.com
+console.log(response.data?.data);
 ```
 
-## Code Structure
+---
 
+## Component Architecture
+
+```text
+src/
+├── client/         # Auto-generated @hey-api TypeScript fetch client & types
+├── components/
+│   ├── common/     # AuthLayout, Logo, Appearance, Footer, ErrorBoundary
+│   ├── layout/     # AppShell, Sidebar, Header
+│   └── ui/         # Button, Input, PasswordInput, Modal, Toast, Alert, Badge, Card
+├── features/
+│   ├── auth/       # LoginForm, auth validation mechanics
+│   ├── dashboard/  # MetricsOverviewCards, SystemHealthCard, TelemetryStream
+│   └── users/      # UsersDataTable, AddUser, EditUser, DeleteUser, UserActionsMenu
+├── hooks/          # useAuth, useTheme, useCustomToast
+└── pages/          # LoginPage, DashboardPage, UsersPage, SettingsPage
 ```
-frontend/
-├── public/                 # Static assets, SVG logos, favicons
-├── openapi.json            # Exported backend OpenAPI 3.1 specification
-├── src/
-│   ├── client/             # Auto-generated @hey-api TypeScript fetch client
-│   │   ├── client.gen.ts   # Configured API client instance
-│   │   ├── sdk.gen.ts      # Typed endpoint SDK functions
-│   │   └── types.gen.ts    # TypeScript interface schemas
-│   ├── components/
-│   │   ├── common/         # AuthLayout, Logo, Appearance, ErrorBoundary, Footer
-│   │   ├── layout/         # AppShell, TopNavbar, Sidebar
-│   │   └── ui/             # Reusable UI primitives (Button, Input, Card, Modal, Badge)
-│   ├── features/
-│   │   ├── auth/           # LoginForm, AuthContext provider, authentication state
-│   │   ├── dashboard/      # MetricsOverviewCards, SystemHealthCard, TelemetryStream
-│   │   └── users/          # UsersDataTable, AddUser, EditUser, DeleteUser modals
-│   ├── hooks/              # Custom React hooks (useAuth, useTheme)
-│   ├── lib/                # Shared utilities, classnames (cn), api error interceptor
-│   ├── pages/              # Top-level view components (LoginPage, DashboardPage, UsersPage, SettingsPage)
-│   ├── App.tsx             # Root application router and shell container
-│   └── main.tsx            # React DOM mounting entrypoint
-├── package.json            # Node.js dependencies & scripts
-├── tailwind.config.js      # Tailwind CSS theme configuration
-└── vite.config.ts          # Vite build and dev-server configuration
-```
+
+---
+
+## Developer Commands
+
+| Command | Action |
+| --- | --- |
+| `make frontend-sync` | Synchronize backend OpenAPI contract with `@hey-api` client. |
+| `make frontend-build` | Verify TypeScript compilation (`tsc`) and build Vite bundle (`dist/`). |
+| `make check` | Execute end-to-end linting, schema zero-drift validation, and tests. |

@@ -25,24 +25,29 @@ export const Modal: React.FC<ModalProps> = ({
         onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-background/80 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-black/60 dark:bg-black/75 backdrop-blur-xs transition-opacity animate-in fade-in-0 duration-150"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Modal Dialog */}
       <div
+        role="dialog"
+        aria-modal="true"
         className={cn(
-          "relative z-50 w-full max-w-lg rounded-xl border border-border bg-card text-card-foreground p-6 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-150",
+          "relative z-50 w-full max-w-lg rounded-xl border border-border bg-card text-card-foreground p-6 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto",
           className
         )}
       >
@@ -56,7 +61,9 @@ export const Modal: React.FC<ModalProps> = ({
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close dialog"
             className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           >
             <X className="h-4 w-4" />
@@ -68,3 +75,5 @@ export const Modal: React.FC<ModalProps> = ({
     </div>
   );
 };
+
+export default Modal;
