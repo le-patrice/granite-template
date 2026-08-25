@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { apiV1UsersListUsers } from "@/client/sdk.gen";
 import type { UserRead } from "@/client/types.gen";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 export const UsersDataTable: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -59,7 +60,7 @@ export const UsersDataTable: React.FC = () => {
             disabled={isLoading}
             className="gap-1.5 text-xs"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-primary" : ""}`} />
+            <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin text-primary")} />
             Refresh
           </Button>
           <AddUser onSuccess={fetchUsers} />
@@ -77,9 +78,11 @@ export const UsersDataTable: React.FC = () => {
         />
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
         {isLoading ? (
-          <LoadingSpinner label="Loading users..." />
+          <div className="p-12">
+            <LoadingSpinner label="Loading users..." />
+          </div>
         ) : filteredUsers.length === 0 ? (
           <EmptyState
             title="No Users Found"
@@ -87,14 +90,16 @@ export const UsersDataTable: React.FC = () => {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-border bg-muted/40 text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-border bg-muted/50 text-muted-foreground font-semibold uppercase tracking-wider text-xs">
                 <tr>
-                  <th className="px-6 py-3.5">Full Name</th>
-                  <th className="px-6 py-3.5">Email</th>
-                  <th className="px-6 py-3.5">Role</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+                  <th className="px-6 py-3.5 font-medium">Full Name</th>
+                  <th className="px-6 py-3.5 font-medium">Email</th>
+                  <th className="px-6 py-3.5 font-medium">Role</th>
+                  <th className="px-6 py-3.5 font-medium">Status</th>
+                  <th className="px-6 py-3.5 text-right font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -102,35 +107,41 @@ export const UsersDataTable: React.FC = () => {
                   const isCurrentUser = currentUser?.id === u.id;
 
                   return (
-                    <tr key={u.id} className="hover:bg-accent/50 transition-colors">
+                    <tr key={u.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-foreground">
+                          <span
+                            className={cn(
+                              "font-medium",
+                              !u.full_name && "text-muted-foreground"
+                            )}
+                          >
                             {u.full_name || "N/A"}
                           </span>
                           {isCurrentUser && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            <Badge variant="outline" className="text-xs">
                               You
                             </Badge>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-muted-foreground font-mono">
+                      <td className="px-6 py-4 text-muted-foreground text-xs font-mono">
                         {u.email}
                       </td>
                       <td className="px-6 py-4">
-                        <Badge variant={u.is_superuser ? "default" : "outline"}>
+                        <Badge variant={u.is_superuser ? "default" : "secondary"}>
                           {u.is_superuser ? "Superuser" : "User"}
                         </Badge>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`h-2 w-2 rounded-full ${
-                              u.is_active ? "bg-emerald-500" : "bg-muted-foreground"
-                            }`}
+                            className={cn(
+                              "h-2 w-2 rounded-full",
+                              u.is_active ? "bg-emerald-500" : "bg-zinc-400"
+                            )}
                           />
-                          <span className={u.is_active ? "text-foreground" : "text-muted-foreground"}>
+                          <span className={u.is_active ? "text-foreground" : "text-muted-foreground text-xs"}>
                             {u.is_active ? "Active" : "Inactive"}
                           </span>
                         </div>
@@ -149,4 +160,5 @@ export const UsersDataTable: React.FC = () => {
     </div>
   );
 };
+
 export default UsersDataTable;

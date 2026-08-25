@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MoreVertical } from "lucide-react";
+import { EllipsisVertical } from "lucide-react";
 import type { UserRead } from "@/client/types.gen";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/Button";
 import { EditUser } from "@/features/users/EditUser";
 import { DeleteUser } from "@/features/users/DeleteUser";
 
@@ -35,21 +36,37 @@ export const UserActionsMenu: React.FC<UserActionsMenuProps> = ({ user, onSucces
 
   return (
     <div className="relative inline-block text-left" ref={menuRef}>
-      <button
+      <Button
+        variant="ghost"
+        size="icon-sm"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+        className="h-8 w-8 text-muted-foreground hover:text-foreground"
         title="User Actions"
+        aria-label="User Actions"
       >
-        <MoreVertical className="h-4 w-4" />
-      </button>
+        <EllipsisVertical className="h-4 w-4" />
+      </Button>
 
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-1 w-36 rounded-lg border border-slate-800 bg-slate-900 p-1 shadow-xl">
-          <EditUser user={user} onSuccess={() => { setIsOpen(false); onSuccess(); }} />
-          <DeleteUser id={user.id} onSuccess={() => { setIsOpen(false); onSuccess(); }} />
+        <div className="absolute right-0 z-50 mt-1 w-36 rounded-lg border border-border bg-popover p-1 shadow-xl animate-in fade-in-0 zoom-in-95 duration-100">
+          <EditUser
+            user={user}
+            onSuccess={() => {
+              setIsOpen(false);
+              onSuccess();
+            }}
+          />
+          <DeleteUser
+            id={user.id}
+            onSuccess={() => {
+              setIsOpen(false);
+              onSuccess();
+            }}
+          />
         </div>
       )}
     </div>
   );
 };
+
 export default UserActionsMenu;

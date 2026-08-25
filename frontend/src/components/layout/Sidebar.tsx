@@ -106,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
           >
             <FileCode2 className="h-4 w-4" />
-            {isOpen && <span>API Docs (Scalar/Swagger)</span>}
+            {isOpen && <span>OpenAPI Docs (/docs)</span>}
           </a>
         </div>
       </div>

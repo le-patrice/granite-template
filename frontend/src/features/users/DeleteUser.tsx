@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Alert, AlertDescription } from "@/components/ui/Alert";
+import { useCustomToast } from "@/hooks/useCustomToast";
 import { apiV1UsersUserIdDeleteUser } from "@/client/sdk.gen";
 
 interface DeleteUserProps {
@@ -10,6 +12,7 @@ interface DeleteUserProps {
 }
 
 export const DeleteUser: React.FC<DeleteUserProps> = ({ id, onSuccess }) => {
+  const { showSuccessToast, showErrorToast } = useCustomToast();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,13 +28,18 @@ export const DeleteUser: React.FC<DeleteUserProps> = ({ id, onSuccess }) => {
       });
 
       if (res.response?.ok) {
+        showSuccessToast("The user was deleted successfully");
         setIsOpen(false);
         onSuccess();
       } else {
-        setError(res.error ? String(res.error) : "User deletion failed.");
+        const msg = res.error ? String(res.error) : "User deletion failed.";
+        setError(msg);
+        showErrorToast(msg);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete user.");
+      const msg = err instanceof Error ? err.message : "Failed to delete user.";
+      setError(msg);
+      showErrorToast(msg);
     } finally {
       setIsLoading(false);
     }
@@ -41,7 +49,7 @@ export const DeleteUser: React.FC<DeleteUserProps> = ({ id, onSuccess }) => {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 rounded-md transition-colors text-left"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 rounded-md transition-colors text-left"
       >
         <Trash2 className="h-3.5 w-3.5" />
         Delete User
@@ -55,18 +63,18 @@ export const DeleteUser: React.FC<DeleteUserProps> = ({ id, onSuccess }) => {
       >
         <form onSubmit={handleDelete} className="space-y-4">
           {error && (
-            <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">
-              {error}
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          <p className="text-xs text-slate-300">
-            All data associated with this user will be{" "}
-            <strong className="text-red-400 font-semibold">permanently deleted.</strong> Are you sure? You will
+          <p className="text-xs text-foreground leading-relaxed">
+            All items associated with this user will also be{" "}
+            <strong className="text-destructive font-semibold">permanently deleted.</strong> Are you sure? You will
             not be able to undo this action.
           </p>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               variant="outline"
               type="button"
@@ -78,7 +86,7 @@ export const DeleteUser: React.FC<DeleteUserProps> = ({ id, onSuccess }) => {
             <Button
               variant="destructive"
               type="submit"
-              isLoading={isLoading}
+              loading={isLoading}
             >
               Delete
             </Button>
@@ -88,4 +96,5 @@ export const DeleteUser: React.FC<DeleteUserProps> = ({ id, onSuccess }) => {
     </>
   );
 };
+
 export default DeleteUser;

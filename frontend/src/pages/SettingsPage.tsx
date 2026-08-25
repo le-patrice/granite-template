@@ -2,29 +2,33 @@ import React, { useState } from "react";
 import { AlertTriangle, Check, AlertCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { Alert, AlertDescription } from "@/components/ui/Alert";
 import { useAuth } from "@/hooks/useAuth";
+import { useCustomToast } from "@/hooks/useCustomToast";
 import { apiV1UsersMeUpdateMe, apiV1UsersMePasswordUpdatePasswordMe, apiV1UsersMeDeleteMe } from "@/client/sdk.gen";
 
 export const SettingsPage: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
+  const { showSuccessToast, showErrorToast } = useCustomToast();
   const [activeTab, setActiveTab] = useState<"profile" | "password" | "danger">("profile");
 
   // Profile Form State
   const [fullName, setFullName] = useState<string>(user?.full_name || "");
   const [email, setEmail] = useState<string>(user?.email || "");
   const [isUpdatingProfile, setIsUpdatingProfile] = useState<boolean>(false);
-  const [profileMsg, setProfileMsg] = useState<string | null>(null);
-  const [profileErr, setProfileErr] = useState<string | null>(null);
+  const [profileEmailError, setProfileEmailError] = useState<string | null>(null);
 
   // Password Form State
   const [currentPassword, setCurrentPassword] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [isUpdatingPassword, setIsUpdatingPassword] = useState<boolean>(false);
-  const [passwordMsg, setPasswordMsg] = useState<string | null>(null);
-  const [passwordErr, setPasswordErr] = useState<string | null>(null);
+  const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null);
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
 
   // Danger Zone State
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false);
@@ -33,26 +37,33 @@ export const SettingsPage: React.FC = () => {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setProfileEmailError("Invalid email address");
+      return;
+    }
+    setProfileEmailError(null);
+
     setIsUpdatingProfile(true);
-    setProfileMsg(null);
-    setProfileErr(null);
 
     try {
       const res = await apiV1UsersMeUpdateMe({
         body: {
-          full_name: fullName,
-          email: email,
+          full_name: fullName.trim() || null,
+          email: email.trim(),
         },
       });
 
       if (res.response?.ok) {
-        setProfileMsg("Profile updated successfully");
+        showSuccessToast("User updated successfully");
         await refreshProfile();
       } else {
-        setProfileErr(res.error ? String(res.error) : "User with this email already exists");
+        const msg = res.error ? String(res.error) : "User with this email already exists";
+        showErrorToast(msg);
       }
     } catch (err: unknown) {
-      setProfileErr(err instanceof Error ? err.message : "Failed to update profile.");
+      const msg = err instanceof Error ? err.message : "Failed to update profile.";
+      showErrorToast(msg);
     } finally {
       setIsUpdatingProfile(false);
     }
@@ -60,22 +71,43 @@ export const SettingsPage: React.FC = () => {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 8) {
-      setPasswordErr("New password must be at least 8 characters");
-      return;
+    let isValid = true;
+
+    if (!currentPassword) {
+      setCurrentPasswordError("Password is required");
+      isValid = false;
+    } else {
+      setCurrentPasswordError(null);
     }
-    if (newPassword !== confirmPassword) {
-      setPasswordErr("The passwords don't match");
-      return;
+
+    if (!newPassword) {
+      setNewPasswordError("Password is required");
+      isValid = false;
+    } else if (newPassword.length < 8) {
+      setNewPasswordError("Password must be at least 8 characters");
+      isValid = false;
+    } else {
+      setNewPasswordError(null);
     }
+
+    if (!confirmPassword) {
+      setConfirmPasswordError("Password confirmation is required");
+      isValid = false;
+    } else if (newPassword !== confirmPassword) {
+      setConfirmPasswordError("The passwords don't match");
+      isValid = false;
+    } else {
+      setConfirmPasswordError(null);
+    }
+
+    if (!isValid) return;
+
     if (currentPassword === newPassword) {
-      setPasswordErr("New password cannot be the same as the current one");
+      setNewPasswordError("New password cannot be the same as the current one");
       return;
     }
 
     setIsUpdatingPassword(true);
-    setPasswordMsg(null);
-    setPasswordErr(null);
 
     try {
       const res = await apiV1UsersMePasswordUpdatePasswordMe({
@@ -86,15 +118,17 @@ export const SettingsPage: React.FC = () => {
       });
 
       if (res.response?.ok) {
-        setPasswordMsg("Password updated successfully");
+        showSuccessToast("Password updated successfully");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       } else {
-        setPasswordErr(res.error ? String(res.error) : "Incorrect password");
+        const msg = res.error ? String(res.error) : "Incorrect password";
+        showErrorToast(msg);
       }
     } catch (err: unknown) {
-      setPasswordErr(err instanceof Error ? err.message : "Failed to update password.");
+      const msg = err instanceof Error ? err.message : "Failed to update password.";
+      showErrorToast(msg);
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -107,22 +141,27 @@ export const SettingsPage: React.FC = () => {
     try {
       const res = await apiV1UsersMeDeleteMe();
       if (res.response?.ok) {
+        showSuccessToast("Your account has been successfully deleted");
         await logout();
       } else {
-        setDeleteErr(res.error ? String(res.error) : "Super users are not allowed to delete themselves");
+        const msg = res.error ? String(res.error) : "Super users are not allowed to delete themselves";
+        setDeleteErr(msg);
+        showErrorToast(msg);
       }
     } catch (err: unknown) {
-      setDeleteErr(err instanceof Error ? err.message : "Failed to delete account.");
+      const msg = err instanceof Error ? err.message : "Failed to delete account.";
+      setDeleteErr(msg);
+      showErrorToast(msg);
     } finally {
       setIsDeleting(false);
     }
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">User Settings</h1>
-        <p className="text-xs text-muted-foreground mt-1">Manage your account settings and preferences</p>
+        <p className="text-sm text-muted-foreground mt-1">Manage your account settings and preferences</p>
       </div>
 
       {/* Tabs Header */}
@@ -163,44 +202,36 @@ export const SettingsPage: React.FC = () => {
 
       {/* Profile Tab */}
       {activeTab === "profile" && (
-        <Card>
+        <Card className="max-w-md">
           <CardHeader>
             <CardTitle>User Information</CardTitle>
             <CardDescription>Update your personal information</CardDescription>
           </CardHeader>
 
-          {profileMsg && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 dark:text-emerald-400">
-              <Check className="h-4 w-4 shrink-0" />
-              <span>{profileMsg}</span>
-            </div>
-          )}
-
-          {profileErr && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{profileErr}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
+          <form onSubmit={handleUpdateProfile} className="space-y-4" noValidate>
             <Input
-              type="email"
-              label="Email *"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <Input
+              id="settings_fullname"
               type="text"
-              label="Full Name"
+              label="Full name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
 
-            <div className="pt-4 flex justify-end">
-              <Button type="submit" isLoading={isUpdatingProfile}>
+            <Input
+              id="settings_email"
+              type="email"
+              label="Email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (profileEmailError) setProfileEmailError(null);
+              }}
+              error={profileEmailError ?? undefined}
+              required
+            />
+
+            <div className="pt-2 flex justify-start">
+              <Button type="submit" loading={isUpdatingProfile}>
                 Save
               </Button>
             </div>
@@ -210,57 +241,55 @@ export const SettingsPage: React.FC = () => {
 
       {/* Password Tab */}
       {activeTab === "password" && (
-        <Card>
+        <Card className="max-w-md">
           <CardHeader>
             <CardTitle>Change Password</CardTitle>
             <CardDescription>Update your account password</CardDescription>
           </CardHeader>
 
-          {passwordMsg && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 dark:text-emerald-400">
-              <Check className="h-4 w-4 shrink-0" />
-              <span>{passwordMsg}</span>
-            </div>
-          )}
-
-          {passwordErr && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{passwordErr}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleUpdatePassword} className="space-y-4">
-            <Input
-              type="password"
-              label="Current Password *"
-              placeholder="Current password"
+          <form onSubmit={handleUpdatePassword} className="space-y-4" noValidate>
+            <PasswordInput
+              id="current_password"
+              label="Current Password"
+              placeholder="••••••••"
               value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
+              onChange={(e) => {
+                setCurrentPassword(e.target.value);
+                if (currentPasswordError) setCurrentPasswordError(null);
+              }}
+              error={currentPasswordError ?? undefined}
               required
             />
 
-            <Input
-              type="password"
-              label="New Password *"
-              placeholder="New password (min 8 chars)"
+            <PasswordInput
+              id="new_password"
+              label="New Password"
+              placeholder="••••••••"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                if (newPasswordError) setNewPasswordError(null);
+              }}
+              error={newPasswordError ?? undefined}
               required
             />
 
-            <Input
-              type="password"
-              label="Confirm Password *"
-              placeholder="Confirm new password"
+            <PasswordInput
+              id="confirm_password"
+              label="Confirm Password"
+              placeholder="••••••••"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                if (confirmPasswordError) setConfirmPasswordError(null);
+              }}
+              error={confirmPasswordError ?? undefined}
               required
             />
 
-            <div className="pt-4 flex justify-end">
-              <Button type="submit" isLoading={isUpdatingPassword}>
-                Save
+            <div className="pt-2 flex justify-start">
+              <Button type="submit" loading={isUpdatingPassword}>
+                Update Password
               </Button>
             </div>
           </form>
@@ -269,54 +298,45 @@ export const SettingsPage: React.FC = () => {
 
       {/* Danger Zone Tab */}
       {activeTab === "danger" && (
-        <Card className="border-destructive/20 bg-destructive/5">
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Delete Account
-            </CardTitle>
-            <CardDescription>
-              Permanently delete your account and all associated data.
-            </CardDescription>
-          </CardHeader>
+        <div className="max-w-md mt-4 rounded-lg border border-destructive/50 p-4">
+          <h3 className="font-semibold text-destructive">Delete Account</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Permanently delete your account and all associated data.
+          </p>
 
-          {deleteErr && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{deleteErr}</span>
-            </div>
-          )}
-
-          <div className="flex justify-between items-center pt-4">
-            <p className="text-xs text-muted-foreground">
-              Once deleted, your account cannot be recovered.
-            </p>
-            <Button variant="destructive" onClick={() => setIsDeleteOpen(true)}>
-              Delete Account
-            </Button>
-          </div>
+          <Button
+            variant="destructive"
+            className="mt-3"
+            onClick={() => setIsDeleteOpen(true)}
+          >
+            Delete Account
+          </Button>
 
           <Modal
             isOpen={isDeleteOpen}
             onClose={() => setIsDeleteOpen(false)}
-            title="Delete Account"
-            description="Are you sure you want to permanently delete your account?"
+            title="Confirmation Required"
+            description="All your account data will be permanently deleted. If you are sure, please click Confirm to proceed. This action cannot be undone."
           >
-            <p className="text-xs text-muted-foreground">
-              This action cannot be undone. All your data will be permanently purged.
-            </p>
+            {deleteErr && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{deleteErr}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
-              <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDeleteAccount} isLoading={isDeleting}>
-                Yes, Delete My Account
+              <Button variant="destructive" onClick={handleDeleteAccount} loading={isDeleting}>
+                Delete
               </Button>
             </div>
           </Modal>
-        </Card>
+        </div>
       )}
     </div>
   );
 };
+
 export default SettingsPage;

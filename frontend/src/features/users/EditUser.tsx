@@ -3,6 +3,9 @@ import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
+import { Alert, AlertDescription } from "@/components/ui/Alert";
+import { useCustomToast } from "@/hooks/useCustomToast";
 import { apiV1UsersUserIdUpdateUserAdmin } from "@/client/sdk.gen";
 import type { UserRead } from "@/client/types.gen";
 
@@ -12,6 +15,7 @@ interface EditUserProps {
 }
 
 export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
+  const { showSuccessToast, showErrorToast } = useCustomToast();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [email, setEmail] = useState<string>(user.email);
   const [fullName, setFullName] = useState<string>(user.full_name || "");
@@ -19,29 +23,67 @@ export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [isSuperuser, setIsSuperuser] = useState<boolean>(!!user.is_superuser);
   const [isActive, setIsActive] = useState<boolean>(!!user.is_active);
-  const [error, setError] = useState<string | null>(null);
+
+  // Field validation errors
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
+
+  // Server error
+  const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const validate = (): boolean => {
+    let isValid = true;
+
+    // Email check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setEmailError("Invalid email address");
+      isValid = false;
+    } else {
+      setEmailError(null);
+    }
+
+    // Password check (optional in edit)
+    if (password) {
+      if (password.length < 8) {
+        setPasswordError("Password must be at least 8 characters");
+        isValid = false;
+      } else {
+        setPasswordError(null);
+      }
+
+      if (password !== confirmPassword) {
+        setConfirmPasswordError("The passwords don't match");
+        isValid = false;
+      } else {
+        setConfirmPasswordError(null);
+      }
+    } else {
+      setPasswordError(null);
+      setConfirmPasswordError(null);
+    }
+
+    return isValid;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password && password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (password && password !== confirmPassword) {
-      setError("The passwords don't match");
+    setServerError(null);
+
+    if (!validate()) {
       return;
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       const res = await apiV1UsersUserIdUpdateUserAdmin({
         path: { user_id: user.id },
         body: {
-          email,
-          full_name: fullName,
+          email: email.trim(),
+          full_name: fullName.trim() || null,
           password: password ? password : null,
           is_superuser: isSuperuser,
           is_active: isActive,
@@ -49,13 +91,18 @@ export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
       });
 
       if (res.response?.ok) {
+        showSuccessToast("User updated successfully");
         setIsOpen(false);
         onSuccess();
       } else {
-        setError(res.error ? String(res.error) : "User update failed.");
+        const msg = res.error ? String(res.error) : "User update failed.";
+        setServerError(msg);
+        showErrorToast(msg);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to update user.");
+      const msg = err instanceof Error ? err.message : "Failed to update user.";
+      setServerError(msg);
+      showErrorToast(msg);
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +112,7 @@ export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 hover:text-white rounded-md transition-colors text-left"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent rounded-md transition-colors text-left"
       >
         <Pencil className="h-3.5 w-3.5" />
         Edit User
@@ -77,23 +124,29 @@ export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
         title="Edit User"
         description="Update the user details below."
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">
-              {error}
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {serverError && (
+            <Alert variant="destructive">
+              <AlertDescription>{serverError}</AlertDescription>
+            </Alert>
           )}
 
           <Input
+            id={`edit_user_email_${user.id}`}
             type="email"
             label="Email *"
             placeholder="Email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (emailError) setEmailError(null);
+            }}
+            error={emailError ?? undefined}
             required
           />
 
           <Input
+            id={`edit_user_fullname_${user.id}`}
             type="text"
             label="Full Name"
             placeholder="Full name"
@@ -101,51 +154,55 @@ export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
             onChange={(e) => setFullName(e.target.value)}
           />
 
-          <Input
-            type="password"
+          <PasswordInput
+            id={`edit_user_password_${user.id}`}
             label="Set Password"
             placeholder="Password (leave blank to keep unchanged)"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordError) setPasswordError(null);
+            }}
+            error={passwordError ?? undefined}
           />
 
-          <Input
-            type="password"
+          <PasswordInput
+            id={`edit_user_confirm_${user.id}`}
             label="Confirm Password"
-            placeholder="Confirm Password"
+            placeholder="Confirm password"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              if (confirmPasswordError) setConfirmPasswordError(null);
+            }}
+            error={confirmPasswordError ?? undefined}
           />
 
           <div className="space-y-2 pt-2">
-            <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-normal text-foreground">
               <input
                 id={`edit_is_superuser_${user.id}`}
                 type="checkbox"
                 checked={isSuperuser}
                 onChange={(e) => setIsSuperuser(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
               />
-              <label htmlFor={`edit_is_superuser_${user.id}`} className="text-xs text-slate-300 select-none">
-                Is superuser?
-              </label>
-            </div>
+              <span>Is superuser?</span>
+            </label>
 
-            <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-normal text-foreground">
               <input
                 id={`edit_is_active_${user.id}`}
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
               />
-              <label htmlFor={`edit_is_active_${user.id}`} className="text-xs text-slate-300 select-none">
-                Is active?
-              </label>
-            </div>
+              <span>Is active?</span>
+            </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               variant="outline"
               type="button"
@@ -154,7 +211,7 @@ export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
             >
               Cancel
             </Button>
-            <Button type="submit" isLoading={isLoading}>
+            <Button type="submit" loading={isLoading}>
               Save
             </Button>
           </div>
@@ -163,4 +220,5 @@ export const EditUser: React.FC<EditUserProps> = ({ user, onSuccess }) => {
     </>
   );
 };
+
 export default EditUser;

@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
+import { Alert, AlertDescription } from "@/components/ui/Alert";
 import { apiV1UsersCreateUserAdmin } from "@/client/sdk.gen";
 import type { UserAdminCreate } from "@/client/types.gen";
 
@@ -30,8 +32,8 @@ export const ProvisionUserModal: React.FC<ProvisionUserModalProps> = ({
 
     try {
       const payload: UserAdminCreate = {
-        email,
-        full_name: fullName,
+        email: email.trim(),
+        full_name: fullName.trim(),
         password,
         is_superuser: isSuperuser,
         is_active: true,
@@ -67,12 +69,14 @@ export const ProvisionUserModal: React.FC<ProvisionUserModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">
-            {error}
-          </div>
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
         <Input
+          id="prov_fullname"
+          type="text"
           label="Full Name"
           placeholder="Jane Doe"
           value={fullName}
@@ -81,6 +85,7 @@ export const ProvisionUserModal: React.FC<ProvisionUserModalProps> = ({
         />
 
         <Input
+          id="prov_email"
           type="email"
           label="Email Address"
           placeholder="user@example.com"
@@ -89,8 +94,8 @@ export const ProvisionUserModal: React.FC<ProvisionUserModalProps> = ({
           required
         />
 
-        <Input
-          type="password"
+        <PasswordInput
+          id="prov_password"
           label="Initial Password"
           placeholder="SecurePassword123!"
           value={password}
@@ -98,24 +103,24 @@ export const ProvisionUserModal: React.FC<ProvisionUserModalProps> = ({
           required
         />
 
-        <div className="flex items-center gap-2 pt-2">
-          <input
-            id="is_superuser"
-            type="checkbox"
-            checked={isSuperuser}
-            onChange={(e) => setIsSuperuser(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500"
-          />
-          <label htmlFor="is_superuser" className="text-xs text-slate-300 select-none">
-            Grant Superadmin Privileges (Elevated RBAC)
+        <div className="space-y-2 pt-2">
+          <label className="flex items-center gap-2.5 cursor-pointer text-xs font-normal text-foreground">
+            <input
+              id="prov_is_superuser"
+              type="checkbox"
+              checked={isSuperuser}
+              onChange={(e) => setIsSuperuser(e.target.checked)}
+              className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+            />
+            <span>Grant Superadmin Privileges (Elevated RBAC)</span>
           </label>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-          <Button variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
+        <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <Button variant="outline" type="button" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button type="submit" isLoading={isLoading}>
+          <Button type="submit" loading={isLoading}>
             Provision User
           </Button>
         </div>
@@ -123,3 +128,5 @@ export const ProvisionUserModal: React.FC<ProvisionUserModalProps> = ({
     </Modal>
   );
 };
+
+export default ProvisionUserModal;

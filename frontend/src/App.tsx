@@ -10,6 +10,7 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { TelemetryStream } from "@/features/dashboard/TelemetryStream";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { ToastProvider } from "@/components/ui/Toast";
 
 const AuthenticatedApp: React.FC = () => {
   const { isAuthenticated, isLoading, refreshProfile } = useAuth();
@@ -62,12 +63,15 @@ const AuthenticatedApp: React.FC = () => {
   );
 };
 
+
 export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
-          <AuthenticatedApp />
+          <ToastProvider>
+            <AuthenticatedApp />
+          </ToastProvider>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>

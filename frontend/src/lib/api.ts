@@ -22,7 +22,7 @@ export function parseApiError(error: unknown, response?: Response): ApiError {
   // 1. Network / Connection Refused (no response produced)
   if (!response) {
     return new ApiError(
-      "Unable to connect to the backend server. Please check your network connection.",
+      "Unable to communicate with the server. Please try again later",
       0,
       error
     );
@@ -35,7 +35,7 @@ export function parseApiError(error: unknown, response?: Response): ApiError {
   // 2. 401 Unauthorized
   if (status === 401) {
     return new ApiError(
-      "Incorrect email or password. Please verify your credentials and try again.",
+      "Incorrect email or password",
       401,
       error
     );
@@ -68,8 +68,8 @@ export function parseApiError(error: unknown, response?: Response): ApiError {
 
     const message =
       retryAfter !== undefined
-        ? `Too many attempts. Please wait ${retryAfter} seconds before trying again.`
-        : "Too many attempts. Please wait a few seconds before trying again.";
+        ? `Too many requests. Please wait ${retryAfter} seconds before retrying`
+        : "Too many requests. Please wait a few seconds before retrying";
 
     return new ApiError(message, 429, error, retryAfter);
   }
@@ -77,7 +77,7 @@ export function parseApiError(error: unknown, response?: Response): ApiError {
   // 4. 500 / 502 / 503 / 504 Server Error
   if (status >= 500 && status <= 599) {
     return new ApiError(
-      "The platform service is currently unavailable. Please try again shortly.",
+      "Unable to communicate with the server. Please try again later",
       status,
       error
     );
