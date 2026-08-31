@@ -156,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {userMenuOpen && (
             <div
               className={cn(
-                "absolute z-50 min-w-56 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-xs animate-in fade-in-0 zoom-in-95 duration-100",
+                "absolute z-50 min-w-56 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-100",
                 isOpen
                   ? "bottom-full left-0 mb-2 w-full"
                   : "left-full bottom-0 ml-2 w-56"

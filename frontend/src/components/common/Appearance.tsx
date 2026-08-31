@@ -59,7 +59,7 @@ export const Appearance: React.FC<AppearanceProps> = ({
       {open && (
         <div
           className={cn(
-            "absolute z-50 min-w-36 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl backdrop-blur-xs animate-in fade-in-0 zoom-in-95 duration-100",
+            "absolute z-50 min-w-36 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-100",
             positionClasses[side]
           )}
         >
@@ -144,7 +144,7 @@ export const SidebarAppearance: React.FC<{ isOpen?: boolean }> = ({ isOpen = tru
       {open && (
         <div
           className={cn(
-            "absolute z-50 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl backdrop-blur-xs animate-in fade-in-0 zoom-in-95 duration-100",
+            "absolute z-50 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-100",
             isOpen ? "bottom-full left-0 mb-2 w-full" : "left-full bottom-0 ml-2"
           )}
         >
