@@ -1,0 +1,161 @@
+# ===========================================================================
+# Traefik v3 — Development Static Configuration with Cloudflare Ingress
+# Generated dynamically by Copier for {{ project_name }}
+# ===========================================================================
+
+# ── Global Daemon Settings ──────────────────────────────────────────────────
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# ── Structured Logging ──────────────────────────────────────────────────────
+log:
+  level: INFO            # DEBUG | INFO | WARN | ERROR
+  format: json           # json | common
+
+accessLog:
+  format: common
+  bufferingSize: 0 # Flushes log lines immediately without buffer delay
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: drop
+      names:
+        X-Request-Id: keep
+        X-Forwarded-For: keep
+        CF-Connecting-IP: keep
+        CF-Ray: keep
+        X-Forwarded-Proto: keep
+
+# ── API / Dashboard (dev only — never expose in production) ─────────────────
+api:
+  dashboard: true
+  insecure: true         # reachable at http://localhost:8080/dashboard/
+
+# ── Entry Points ─────────────────────────────────────────────────────────────
+entryPoints:
+  web:
+    address: ":80"
+    forwardedHeaders:
+      insecure: true     # Trust Cloudflare Zero Trust tunnel & proxy headers
+    http2:
+      maxConcurrentStreams: 250
+
+# ── Providers: file (this file) + Docker labels ─────────────────────────────
+providers:
+  file:
+    filename: /etc/traefik/traefik-dev.yml
+    watch: true
+
+  docker:
+    endpoint: "unix:///run/podman/podman.sock"
+    exposedByDefault: false
+    network: {{ project_slug }}_net
+
+# ── Middlewares & Routing ───────────────────────────────────────────────────
+http:
+  middlewares:
+
+    # ── CORS — applied to API routes ────────────────────────────────────────
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList:
+          - "http://localhost"
+          - "http://localhost:5173"
+          - "http://localhost:3000"
+          - "http://localhost:{{ app_port }}"
+          - "https://*.pages.dev"
+        accessControlMaxAge: 86400
+        addVaryHeader: true
+
+    # ── Security Headers ────────────────────────────────────────────────────
+    secure-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "same-origin"
+        customResponseHeaders:
+          X-Powered-By: ""
+
+    # ── Rate Limiting (Global Edge Throttling) ──────────────────────────────
+    global-ratelimit:
+      rateLimit:
+        average: 150
+        burst: 50
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+  # ── Routers ────────────────────────────────────────────────────────────────
+  routers:
+
+    # 1. API Router (Host api.* or Path /api/*)
+    api-router:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`^{subdomain:(api|api-dev)\\..*}`) || PathPrefix(`/api`)"
+      service: app-service
+      middlewares:
+        - cors-headers
+        - secure-headers
+        - global-ratelimit
+
+    # 2. Docs Router (Host docs.* or Path /docs, /scalar, /swagger)
+    docs-router:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`^{subdomain:(docs|docs-dev)\\..*}`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`) || PathPrefix(`/redoc`) || PathPrefix(`/elements`) || PathPrefix(`/rapidoc`)"
+      service: app-service
+      middlewares:
+        - cors-headers
+        - secure-headers
+
+    # 3. Health Probes & Metrics Router
+    health-metrics-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/health`) || PathPrefix(`/metrics`)"
+      service: app-service
+      middlewares:
+        - secure-headers
+
+{% if include_frontend %}
+    # 4. Frontend Router (Catch-all for SPA UI)
+    frontend-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/`)"
+      service: frontend-service
+      middlewares:
+        - secure-headers
+{% endif %}
+
+  # ── Backend Services ───────────────────────────────────────────────────────
+  services:
+
+    # Litestar / Granian backend service
+    app-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://app:8000"
+
+{% if include_frontend %}
+    # Vite dev-server frontend service
+    frontend-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://frontend:5173"
+{% endif %}

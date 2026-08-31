@@ -218,7 +218,7 @@ auto_launch:
 _tasks:
   - >-
     {% if init_git %}
-    git init -b main && git add . && git commit -m "feat(init): scaffold enterprise platform from LiteForge template" || true
+    git init -b main && git add . && git commit -m "feat(init): scaffold {{ project_name }} from template" || true
     {% endif %}
   - >-
     {% if auto_launch %}

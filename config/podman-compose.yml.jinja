@@ -1,0 +1,284 @@
+# ===========================================================================
+# Development mesh – rootless Podman / Docker Compose
+# Generated dynamically by Copier for {{ project_name }}
+# ===========================================================================
+
+name: {{ project_slug }}
+
+networks:
+  platform_net:
+    name: {{ project_slug }}_net
+    driver: bridge
+
+services:
+
+{% if include_pgbouncer %}
+  # ── PgBouncer Connection Pooler (Transaction Pooling Gateway) ──────────────
+  pgbouncer:
+    image: docker.io/edoburu/pgbouncer:latest
+    container_name: {{ project_slug }}_pgbouncer
+    restart: unless-stopped
+    expose:
+      - "6432"
+    environment:
+      - DB_USER={{ postgres_user }}
+      - DB_PASSWORD={{ postgres_password }}
+      - DB_HOST=postgres-db
+      - DB_PORT=5432
+      - DB_NAME={{ postgres_db }}
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=1000
+      - DEFAULT_POOL_SIZE=25
+      - AUTH_TYPE=scram-sha-256
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - platform_net
+{% endif %}
+
+{% if include_traefik %}
+  # ── Traefik reverse proxy ──────────────────────────────────────────────────
+  traefik:
+    image: docker.io/traefik:v3.3
+    container_name: {{ project_slug }}_traefik
+    restart: unless-stopped
+    ports:
+      - "${PORT:-{{ app_port }}}:80"      # public HTTP / h2c entrypoint
+      - "${DASHBOARD_PORT:-8080}:8080"     # Traefik dashboard (dev only)
+    volumes:
+      # Podman rootless socket — expose it read-only for label discovery
+      - /run/user/${UID:-1000}/podman/podman.sock:/run/podman/podman.sock:ro
+      # Static configuration file
+      - ./traefik-dev.yml:/etc/traefik/traefik-dev.yml:ro
+    command:
+      - "--providers.file.filename=/etc/traefik/traefik-dev.yml"
+      - "--providers.docker.endpoint=unix:///run/podman/podman.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network={{ project_slug }}_net"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=INFO"
+      - "--log.format=json"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+    networks:
+      - platform_net
+    depends_on:
+      - app
+{% endif %}
+
+{% if include_cloudflare_tunnel %}
+  # ── Cloudflare Zero Trust Tunnel ───────────────────────────────────────────
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:latest
+    container_name: {{ project_slug }}_cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARED_TUNNEL_TOKEN:-}
+    networks:
+      - platform_net
+    profiles:
+      - production
+      - edge
+    {% if include_traefik %}
+    depends_on:
+      - traefik
+    {% endif %}
+{% endif %}
+
+{% if include_mailpit %}
+  # ── Mailpit Mock SMTP Server (Development Email Inspection) ────────────────
+  mailpit:
+    image: docker.io/axllent/mailpit:latest
+    container_name: {{ project_slug }}_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"      # SMTP ingress
+      - "8025:8025"      # Web UI (http://localhost:8025)
+    networks:
+      - platform_net
+{% endif %}
+
+  # ── Litestar backend ───────────────────────────────────────────────────────
+  app:
+    build:
+      context: ../backend
+      dockerfile: ../config/Containerfile
+    image: localhost/{{ project_slug }}-app:latest
+    container_name: {{ project_slug }}_backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+    {% if not include_traefik %}
+    ports:
+      - "{{ app_port }}:8000"
+    {% endif %}
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONIOENCODING=utf-8
+      - DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      {% if include_valkey %}
+      - VALKEY_HOST=valkey-cache
+      - VALKEY_PORT=6379
+      {% endif %}
+      - ENVIRONMENT=development
+      - APP_BASE_URL=http://localhost:{{ app_port }}
+      - SECRET_KEY=${SECRET_KEY:-{{ secret_key }}}
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-{{ first_superuser_email }}}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-{{ first_superuser_password }}}
+      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME:-{{ author_name }}}
+      - DOCS_UI={{ docs_ui }}
+      - RATE_LIMIT_ENABLED={{ "true" if include_rate_limiting else "false" }}
+      {% if include_sentry and sentry_dsn %}
+      - SENTRY_DSN={{ sentry_dsn }}
+      {% endif %}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    volumes:
+      - ../backend/src:/app/src:z        # live-reload via Granian --reload
+      - ../backend/tests:/app/tests:z
+      - ../backend/scripts:/app/scripts:z
+      - ../backend/alembic:/app/alembic:z
+      - ../backend/alembic.ini:/app/alembic.ini:z
+      - ../backend/pyproject.toml:/app/pyproject.toml:z
+      - ../logs:/app/logs:z
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      {% if include_valkey %}
+      valkey-cache:
+        condition: service_started
+      {% endif %}
+    networks:
+      - platform_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.app.loadbalancer.server.port=8000"
+
+{% if include_distributed_worker %}
+  # ── SAQ Background Worker ──────────────────────────────────────────────────
+  worker:
+    build:
+      context: ../backend
+      dockerfile: ../config/Containerfile
+    image: localhost/{{ project_slug }}-worker:latest
+    container_name: {{ project_slug }}_worker
+    restart: unless-stopped
+    command: ["python", "-m", "saq", "app.core.worker.settings", "--workers", "4"]
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONIOENCODING=utf-8
+      - DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      {% if include_valkey %}
+      - VALKEY_HOST=valkey-cache
+      - VALKEY_PORT=6379
+      {% endif %}
+      - ENVIRONMENT=development
+      - APP_BASE_URL=http://localhost:{{ app_port }}
+      - SECRET_KEY=${SECRET_KEY:-{{ secret_key }}}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    volumes:
+      - ../backend/src:/app/src:z
+      - ../backend/pyproject.toml:/app/pyproject.toml:z
+      - ../logs:/app/logs:z
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      {% if include_valkey %}
+      valkey-cache:
+        condition: service_started
+      {% endif %}
+    networks:
+      - platform_net
+{% endif %}
+
+{% if include_frontend %}
+  # ── Vite frontend dev-server ───────────────────────────────────────────────
+  frontend:
+    image: docker.io/library/node:22-alpine
+    container_name: {{ project_slug }}_frontend
+    working_dir: /app
+    volumes:
+      - ../frontend:/app:z
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=
+      - VITE_INITIAL_ADMIN_EMAIL=${FIRST_SUPERUSER_EMAIL:-{{ first_superuser_email }}}
+      - VITE_INITIAL_ADMIN_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-{{ first_superuser_password }}}
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    networks:
+      - platform_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=5173"
+{% endif %}
+
+  # ── TimescaleDB + pgvector ─────────────────────────────────────────────────
+  postgres-db:
+    {% if include_timescaledb %}
+    image: docker.io/timescale/timescaledb-ha:pg16
+    {% else %}
+    image: docker.io/library/postgres:16-alpine
+    {% endif %}
+    container_name: {{ project_slug }}_postgres
+    restart: unless-stopped
+    environment:
+      - PGDATA=/var/lib/postgresql/data
+      - POSTGRES_USER={{ postgres_user }}
+      - POSTGRES_PASSWORD={{ postgres_password }}
+      - POSTGRES_DB={{ postgres_db }}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:Z
+    ports:
+      - "{{ postgres_port }}:5432"    # direct access for migrations & psql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U {{ postgres_user }} -d {{ postgres_db }} || exit 0"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - platform_net
+
+{% if include_valkey %}
+  # ── Valkey ────────────────────────────────────────────────────────────────
+  valkey-cache:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: {{ project_slug }}_valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data:Z
+    networks:
+      - platform_net
+{% endif %}
+
+volumes:
+  postgres_data:
+    name: {{ project_slug }}_postgres_data
+{% if include_valkey %}
+  valkey_data:
+    name: {{ project_slug }}_valkey_data
+{% endif %}
+{% if include_frontend %}
+  frontend_node_modules:
+    name: {{ project_slug }}_frontend_node_modules
+{% endif %}

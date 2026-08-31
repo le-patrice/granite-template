@@ -29,7 +29,7 @@ PROJECT_NAME     ?= $(shell grep -E '^COMPOSE_PROJECT_NAME=' .env 2>/dev/null | 
 export CONTAINER_HOST ?= unix:///run/user/$(shell id -u)/podman/podman.sock
 
 # Execution wrappers
-COMPOSE_BASE  := $(CONTAINER_ENGINE) compose $(COMPOSE_FILE)
+COMPOSE_BASE  := $(CONTAINER_ENGINE) compose $(ENV_FILE) $(COMPOSE_FILE)
 EXEC_APP      := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i $(PROJECT_NAME)_backend
 EXEC_DB       := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i $(PROJECT_NAME)_postgres
 {% if include_frontend %}
@@ -305,12 +305,12 @@ build: ## Build standard container images defined in Compose
 .PHONY: build-backend
 build-backend: ## Build only the backend container image from root context
 	@echo -e "$(BLUE)Building backend image (config/Containerfile)...$(NC)"
-	@$(CONTAINER_ENGINE) build -t api-backend -f config/Containerfile .
+	@$(CONTAINER_ENGINE) build -t localhost/{{ project_slug }}-app:latest -f config/Containerfile backend/
 	@echo -e "$(GREEN)✅ Backend build finished$(NC)"
 
 .PHONY: build-backend-clean
 build-backend-clean: ## Build backend container with no cache
-	@$(CONTAINER_ENGINE) build --no-cache -t api-backend -f config/Containerfile .
+	@$(CONTAINER_ENGINE) build --no-cache -t localhost/{{ project_slug }}-app:latest -f config/Containerfile backend/
 
 .PHONY: pull
 pull: ## Pull latest base images (TimescaleDB, Valkey) from registries
