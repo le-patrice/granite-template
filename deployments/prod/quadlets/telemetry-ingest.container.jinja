@@ -1,0 +1,23 @@
+[Unit]
+Description=Go High-Throughput Telemetry Ingestion Microservice - {{ project_name }}
+After=postgres.service valkey.service
+Requires=postgres.service valkey.service
+
+[Container]
+ContainerName={{ project_slug }}-telemetry-ingest
+Pod=platform.pod
+Image=localhost/{{ project_slug }}-telemetry-ingest:latest
+Environment=PORT=8001
+Environment=DATABASE_URL=postgres://{{ postgres_user }}:{{ postgres_password }}@127.0.0.1:5432/{{ postgres_db }}?sslmode=disable
+Environment=VALKEY_HOST=127.0.0.1
+Environment=VALKEY_PORT=6379
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=64m
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=60
+
+[Install]
+WantedBy=default.target multi-user.target

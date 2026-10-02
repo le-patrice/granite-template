@@ -1,0 +1,24 @@
+# Stage 1: Build static standalone binary
+FROM docker.io/library/golang:1.24-alpine AS builder
+
+WORKDIR /build
+
+RUN apk add --no-cache git ca-certificates
+
+COPY go.mod go.sum* ./
+COPY . .
+RUN go mod tidy && go mod download && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o telemetry-ingest .
+
+# Stage 2: Minimal Distroless runtime image (~18MB total)
+FROM gcr.io/distroless/static-debian12:nonroot
+
+WORKDIR /app
+COPY --from=builder /build/telemetry-ingest /app/telemetry-ingest
+
+EXPOSE 8001
+USER nonroot:nonroot
+
+ENTRYPOINT ["/app/telemetry-ingest"]

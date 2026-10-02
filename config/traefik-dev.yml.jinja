@@ -100,11 +100,25 @@ http:
   # ── Routers ────────────────────────────────────────────────────────────────
   routers:
 
+{% if include_go_telemetry %}
+    # 0. Go Telemetry Ingest Bypass Router (High-throughput zero-copy ingestion)
+    telemetry-ingest-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/api/v1/telemetry/ingest`)"
+      priority: 100
+      service: telemetry-ingest-service
+      middlewares:
+        - cors-headers
+        - secure-headers
+{% endif %}
+
     # 1. API Router (Host api.* or Path /api/*)
     api-router:
       entryPoints:
         - web
       rule: "HostRegexp(`^{subdomain:(api|api-dev)\\..*}`) || PathPrefix(`/api`)"
+      priority: 66
       service: app-service
       middlewares:
         - cors-headers
@@ -116,6 +130,7 @@ http:
       entryPoints:
         - web
       rule: "HostRegexp(`^{subdomain:(docs|docs-dev)\\..*}`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`) || PathPrefix(`/redoc`) || PathPrefix(`/elements`) || PathPrefix(`/rapidoc`)"
+      priority: 120
       service: app-service
       middlewares:
         - cors-headers
@@ -126,6 +141,7 @@ http:
       entryPoints:
         - web
       rule: "PathPrefix(`/health`) || PathPrefix(`/metrics`)"
+      priority: 47
       service: app-service
       middlewares:
         - secure-headers
@@ -136,6 +152,7 @@ http:
       entryPoints:
         - web
       rule: "PathPrefix(`/`)"
+      priority: 15
       service: frontend-service
       middlewares:
         - secure-headers
@@ -149,7 +166,16 @@ http:
       loadBalancer:
         passHostHeader: true
         servers:
-          - url: "http://app:8000"
+          - url: "http://127.0.0.1:8000"
+
+{% if include_go_telemetry %}
+    # Go High-Throughput Telemetry Ingest Microservice
+    telemetry-ingest-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://127.0.0.1:8001"
+{% endif %}
 
 {% if include_frontend %}
     # Vite dev-server frontend service
@@ -157,5 +183,5 @@ http:
       loadBalancer:
         passHostHeader: true
         servers:
-          - url: "http://frontend:5173"
+          - url: "http://127.0.0.1:5173"
 {% endif %}

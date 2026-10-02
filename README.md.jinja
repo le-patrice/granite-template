@@ -4,7 +4,7 @@
 
 ---
 
-## ⚡ Quickstart
+## Quickstart
 
 ### 1. Boot Container Mesh
 ```bash
@@ -28,15 +28,20 @@ make test
 ```
 
 ### 4. Interactive Endpoints
+{% if include_frontend %}
+- **Frontend Dashboard:** [http://localhost:{{ app_port }}](http://localhost:{{ app_port }})
+{% endif %}
 - **Swagger UI:** [http://localhost:{{ app_port }}/docs/swagger](http://localhost:{{ app_port }}/docs/swagger)
 - **Scalar UI:** [http://localhost:{{ app_port }}/docs/scalar](http://localhost:{{ app_port }}/docs/scalar)
 - **OpenAPI Schema:** [http://localhost:{{ app_port }}/docs/openapi.json](http://localhost:{{ app_port }}/docs/openapi.json)
 - **Health Readiness:** [http://localhost:{{ app_port }}/health/ready](http://localhost:{{ app_port }}/health/ready)
+{% if include_prometheus_metrics %}
 - **Prometheus Metrics:** [http://localhost:{{ app_port }}/metrics](http://localhost:{{ app_port }}/metrics)
+{% endif %}
 
 ---
 
-## 🛠️ Common Workflows
+## Common Workflows
 
 ### Creating Database Migrations
 ```bash
@@ -75,6 +80,33 @@ make worker-logs
 ```
 {% endif %}
 
+{% if include_transactional_outbox %}
+### Real-Time Event Outbox Relay
+```bash
+# Start the dedicated PostgreSQL LISTEN/NOTIFY outbox event daemon
+make outbox-listen
+```
+{% endif %}
+
+{% if include_go_telemetry %}
+### Go High-Throughput Telemetry Ingest Bypass
+```bash
+# Build the compiled Go telemetry ingest microservice image
+make build-telemetry
+
+# Stream telemetry ingest service logs
+make logs-telemetry
+```
+{% endif %}
+
+{% if enable_quadlets %}
+### Production Systemd Quadlet Validation
+```bash
+# Validate Quadlet service unit generation without altering host state
+make quadlet-dryrun
+```
+{% endif %}
+
 {% if include_cloudflare_tunnel %}
 ### Cloudflare Zero Trust Tunnel
 ```bash
@@ -88,10 +120,11 @@ make tunnel-logs
 
 ---
 
-## 📚 Documentation
-- **[Architecture](docs/ARCHITECTURE.md)**: Container topology, clean architecture boundaries, and database design.
+## Documentation
+- **[Domain Blueprint](docs/DOMAIN_BLUEPRINT.md)**: Authoritative 12-layer clean architecture specification for adding domain logic, schemas, and services.
+- **[Architecture](docs/ARCHITECTURE.md)**: Container topology, C4 model, native Podman Pod, and clean architecture boundaries.
 - **[Development](docs/DEVELOPMENT.md)**: Adding new domain features, testing runbook, and conventions.
-- **[Security & RBAC](docs/SECURITY_AND_RBAC.md)**: Argon2 hashing, JWT flows, and Superadmin RBAC guards.
+- **[Security & RBAC](docs/SECURITY_AND_RBAC.md)**: Argon2id hashing, JWT flows, and Superadmin RBAC guards.
 - **[Workers & Resilience](docs/WORKERS_AND_RESILIENCE.md)**: Asynchronous task queue, Outbox pattern, and circuit breakers.
 - **[Deployment](docs/DEPLOYMENT.md)**: Production Quadlets, Traefik edge routing, and PgBouncer pooling.
 - **[Operational Runbook](docs/RUNBOOK.md)**: Disaster recovery and troubleshooting recipes.

@@ -23,8 +23,7 @@ from app.domain.base import Base
 class TelemetryReading(Base):
     __tablename__ = "telemetry_readings"
 
-    # Surrogate primary key – TimescaleDB hypertables work best with a
-    # (id, time) composite PK, but a simple UUID is fine for now.
+    # Composite primary key (id, recorded_at) required for TimescaleDB hypertables
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
         default=uuid.uuid4,
@@ -38,9 +37,10 @@ class TelemetryReading(Base):
     power_factor: Mapped[float] = mapped_column(Float, nullable=False)
     frequency_hz: Mapped[float] = mapped_column(Float, nullable=False)
 
-    # Wall-clock time of the physical measurement (UTC, timezone-aware)
+    # Wall-clock time of the physical measurement (UTC, timezone-aware) - Part of hypertable PK
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        primary_key=True,
         nullable=False,
         index=True,
     )

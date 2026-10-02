@@ -1,0 +1,19 @@
+[Unit]
+Description=Frontend SPA Production Web Interface
+After=app.service
+Requires=app.service
+
+[Container]
+ContainerName=platform-frontend
+Pod=platform.pod
+Image=localhost/enterprise-platform-frontend:latest
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=64m
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=60
+
+[Install]
+WantedBy=default.target multi-user.target

@@ -109,8 +109,12 @@ class RequestLoggingMiddleware(AbstractMiddleware):
             await self.app(scope, receive, tracking_send)
         finally:
             duration_ms = round((time.monotonic() - start_time) * 1000, 2)
-            # Instantly flush log line to standard stdout for docker/podman logs
-            sys.stdout.write(
-                f'[INFO] {client_ip} - "{method} {path} HTTP/{scope.get("http_version", "1.1")}" {status_code} ({duration_ms}ms)\n'
+            self.logger.info(
+                "http.access",
+                client_ip=client_ip,
+                method=method,
+                path=path,
+                status=status_code,
+                duration_ms=duration_ms,
+                http_version=scope.get("http_version", "1.1"),
             )
-            sys.stdout.flush()

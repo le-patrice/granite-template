@@ -1,0 +1,20 @@
+[Unit]
+Description=Traefik v3 Edge Proxy & Ingress Mesh
+After=app.service telemetry-ingest.service frontend.service
+
+[Container]
+ContainerName=platform-traefik
+Pod=platform.pod
+Image=docker.io/traefik:v3.3
+Exec=--providers.file.filename=/etc/traefik/traefik-prod.yml --entrypoints.web.address=:80 --log.level=INFO --log.format=json --accesslog=true --accesslog.format=json
+Volume=/etc/platform/traefik-prod.yml:/etc/traefik/traefik-prod.yml:ro,Z
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=64m
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=60
+
+[Install]
+WantedBy=default.target multi-user.target

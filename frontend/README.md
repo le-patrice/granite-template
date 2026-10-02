@@ -4,7 +4,7 @@
   <img src="../docs/assets/dashboard-preview.png" alt="Frontend UI Preview" width="100%"/>
 </p>
 
-Single Page Application built on React 18, Vite, TypeScript, and Tailwind CSS.
+Single Page Application built on React 19, Vite, TypeScript, and Tailwind CSS.
 
 ---
 

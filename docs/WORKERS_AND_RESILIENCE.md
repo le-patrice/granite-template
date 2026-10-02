@@ -84,14 +84,29 @@ To guarantee at-least-once message delivery without two-phase commit (2PC) locks
                                └───► Insert into dead_letter_events (DLQ)
 ```
 
-### 2.2 Outbox CLI & DLQ Replay Operations
+### 2.2 Dual-Mode Event Relay Architecture
+
+The platform supports two complementary outbox relay mechanisms:
+
+1. **Real-Time Event-Driven Daemon (`LISTEN/NOTIFY`):**
+   A dedicated background daemon connects directly to PostgreSQL port `5432` (bypassing PgBouncer) and registers a persistent `LISTEN outbox_events_channel`. When a database transaction commits an outbox event, PostgreSQL fires a native `NOTIFY` trigger. The listener receives the payload and pushes it to Valkey Pub/Sub within 1–2 milliseconds.
+   ```bash
+   # Run the real-time event-driven outbox daemon
+   make outbox-listen
+   ```
+
+2. **Periodic Safety-Net Sweep:**
+   A scheduled batch sweep queries for any events remaining in `PENDING` status using `SELECT ... FOR UPDATE SKIP LOCKED`. This guarantees at-least-once delivery even if network hiccups briefly disconnect the real-time listener.
+   ```bash
+   # Trigger an immediate manual sweep of pending outbox events
+   make outbox-relay
+   ```
+
+### 2.3 Outbox CLI & DLQ Replay Operations
 
 ```bash
 # Inspect pending outbox events and quarantined DLQ items
 make outbox-status
-
-# Trigger an immediate background sweep of pending outbox events
-make outbox-relay
 
 # Replay quarantined Dead Letter Queue events back into PENDING state
 make dlq-replay
@@ -99,7 +114,33 @@ make dlq-replay
 
 ---
 
-## 3. Idempotency Guard Middleware
+## 3. Zero-Copy Streaming Engine (RAM < 25MB)
+
+For multi-gigabyte dataset exports, Parquet dumps, and continuous telemetry feeds, the platform provides the [`app.core.streaming`](file:///home/pat/Business/LiteStar/backend/src/app/core/streaming.py) module.
+
+### 3.1 Streaming Mechanisms
+- **`stream_file_chunks(path, chunk_size=65536)`:** Reads large on-disk artifacts in 64KB increments and streams directly through the ASGI response pipeline.
+- **`stream_memoryview_chunks(data, chunk_size=65536)`:** Slices Python buffers using `memoryview` objects. This avoids duplicate string or bytes allocations in Python's garbage collector, keeping resident memory strictly bounded under 25MB regardless of total file size.
+- **`stream_dataset_batches(query, session, batch_size=1000)`:** Executes cursor-streamed database reads via `yield_per()` without materializing whole result sets in memory.
+
+```python
+from litestar import get
+from litestar.response import Stream
+from app.core.streaming import stream_memoryview_chunks
+
+@get("/api/v1/analytics/export")
+async def export_dataset() -> Stream:
+    # Streams zero-copy memoryview slices directly into ASGI chunks
+    return Stream(
+        stream_file_chunks("/tmp/analytics_dump.parquet"),
+        headers={"Content-Disposition": 'attachment; filename="analytics.parquet"'},
+        media_type="application/octet-stream",
+    )
+```
+
+---
+
+## 4. Idempotency Guard Middleware
 
 The [`IdempotencyMiddleware`](file:///home/pat/Business/LiteStar/backend/src/app/core/idempotency.py) prevents duplicate execution on all mutating endpoints (`POST`, `PUT`, `PATCH`):
 
@@ -112,7 +153,7 @@ The [`IdempotencyMiddleware`](file:///home/pat/Business/LiteStar/backend/src/app
 
 ---
 
-## 4. Circuit Breakers
+## 5. Circuit Breakers
 
 The [`CircuitBreaker`](file:///home/pat/Business/LiteStar/backend/src/app/core/circuit_breaker.py) state machine wraps flaky downstream integrations (such as external SMTP or payment gateways):
 
@@ -130,9 +171,9 @@ cb = CircuitBreaker(
 
 ---
 
-## 5. Three-Stage Health Probes & Prometheus Metrics
+## 6. Three-Stage Health Probes & Prometheus Metrics
 
-### 5.1 Health Probe Matrix
+### 6.1 Health Probe Matrix
 
 | Probe | Endpoint | Check Performed | Target Environment |
 | :--- | :--- | :--- | :--- |

@@ -57,6 +57,9 @@ def upgrade() -> None:
         DO $$
         BEGIN
             IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+                -- Convert telemetry_readings to a TimescaleDB hypertable partitioned by recorded_at
+                PERFORM create_hypertable('telemetry_readings', 'recorded_at', if_not_exists => true);
+
                 -- Enable compression on hypertable if not already enabled
                 ALTER TABLE telemetry_readings SET (
                     timescaledb.compress,

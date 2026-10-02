@@ -11,6 +11,9 @@ class AppSettings(BaseSettings):
 
     # ── Database ──────────────────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db"
+    # Direct database connection URL (bypassing PgBouncer transaction pooling on 6432)
+    # Required for stateful operations: PostgreSQL LISTEN/NOTIFY, migrations, and direct streaming
+    DIRECT_DATABASE_URL: str | None = None
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
 
@@ -57,6 +60,18 @@ class AppSettings(BaseSettings):
     def smtp_configured(self) -> bool:
         """True only when all required SMTP credentials are present."""
         return bool(self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
+
+    @property
+    def direct_db_url(self) -> str:
+        """
+        Returns direct connection URL to PostgreSQL (port 5432) for stateful operations.
+        Bypasses PgBouncer transaction pooling so LISTEN/NOTIFY and DDL never lose session state.
+        """
+        if self.DIRECT_DATABASE_URL:
+            return self.DIRECT_DATABASE_URL
+        if ":6432" in self.DATABASE_URL:
+            return self.DATABASE_URL.replace(":6432", ":5432")
+        return self.DATABASE_URL
 
 
 settings = AppSettings()

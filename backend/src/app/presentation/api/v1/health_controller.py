@@ -67,15 +67,10 @@ class HealthController(Controller):
 
         # 2. Valkey check
         try:
-            import valkey.asyncio as valkey
+            from app.core.cache import get_valkey_pool
 
-            v_client = valkey.Valkey(
-                host=settings.VALKEY_HOST,
-                port=settings.VALKEY_PORT,
-                socket_timeout=1.5,
-            )
-            pong = await v_client.ping()
-            await v_client.aclose()
+            valkey_client = get_valkey_pool()
+            pong = await valkey_client.ping()
             if pong:
                 results["valkey"] = "healthy"
             else:
@@ -88,7 +83,7 @@ class HealthController(Controller):
             if settings.ENVIRONMENT == "production":
                 all_ready = False
 
-        if not all_ready and results.get("database") != "healthy":
+        if not all_ready:
             raise HTTPException(
                 status_code=HTTP_503_SERVICE_UNAVAILABLE,
                 detail={"status": "not_ready", "dependencies": results},

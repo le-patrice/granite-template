@@ -1,0 +1,22 @@
+[Unit]
+Description=SAQ Distributed Task Worker - {{ project_name }}
+After=platform-pod.service {% if include_pgbouncer %}pgbouncer.service {% else %}postgres.service {% endif %}{% if include_valkey %}valkey.service{% endif %}
+Wants=platform-pod.service
+
+[Container]
+ContainerName={{ project_slug }}-worker
+Pod=platform.pod
+Image=localhost/{{ project_slug }}-app:latest
+EnvironmentFile=/etc/{{ project_slug }}/app.env
+Exec=python -m saq app.core.worker.settings --workers 4
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=128m
+Volume=/var/log/{{ project_slug }}:/app/logs:Z
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target multi-user.target

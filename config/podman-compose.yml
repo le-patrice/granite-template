@@ -42,6 +42,7 @@ services:
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=25
       - AUTH_TYPE=scram-sha-256
+      - LISTEN_PORT=6432
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -119,7 +120,8 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONIOENCODING=utf-8
-      - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
+      - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@pgbouncer:6432/app_db
+      - DIRECT_DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
       - VALKEY_HOST=valkey-cache
       - VALKEY_PORT=6379
       - ENVIRONMENT=development
@@ -146,8 +148,8 @@ services:
       retries: 5
       start_period: 15s
     depends_on:
-      postgres-db:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
       valkey-cache:
         condition: service_started
     networks:
@@ -168,7 +170,8 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONIOENCODING=utf-8
-      - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
+      - DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@pgbouncer:6432/app_db
+      - DIRECT_DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@postgres-db:5432/app_db
       - VALKEY_HOST=valkey-cache
       - VALKEY_PORT=6379
       - ENVIRONMENT=development
@@ -182,8 +185,8 @@ services:
       - ../backend/pyproject.toml:/app/pyproject.toml:z
       - ../logs:/app/logs:z
     depends_on:
-      postgres-db:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
       valkey-cache:
         condition: service_started
     networks:
@@ -224,7 +227,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data:Z
     ports:
-      - "5432:5432"    # direct access for migrations & psql
+      - "${POSTGRES_PORT:-5432}:5432"    # direct access for migrations & psql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U app_user -d app_db || exit 0"]
       interval: 5s
@@ -240,7 +243,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-enterprise}_valkey
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${VALKEY_PORT:-6379}:6379"
     volumes:
       - valkey_data:/data:Z
     networks:

@@ -1,0 +1,298 @@
+# ==============================================================================
+# Platform Pod Specification — Native Podman & Kubernetes Manifest
+#
+# Deploy natively via:
+#   podman kube play config/platform-pod.yaml
+#
+# Teardown:
+#   podman kube down config/platform-pod.yaml
+# ==============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: platform-pod
+  labels:
+    app.kubernetes.io/name: enterprise-platform
+    app.kubernetes.io/part-of: granite-template
+spec:
+  restartPolicy: Always
+
+  # ── Volumes ─────────────────────────────────────────────────────────────────
+  volumes:
+    - name: postgres-storage
+      persistentVolumeClaim:
+        claimName: postgres-data
+    - name: valkey-storage
+      persistentVolumeClaim:
+        claimName: valkey-data
+    - name: traefik-config
+      hostPath:
+        path: ./config/traefik-dev.yml
+        type: File
+    - name: backend-src
+      hostPath:
+        path: ./backend/src
+        type: Directory
+    - name: backend-tests
+      hostPath:
+        path: ./backend/tests
+        type: Directory
+    - name: backend-scripts
+      hostPath:
+        path: ./backend/scripts
+        type: Directory
+    - name: backend-alembic
+      hostPath:
+        path: ./backend/alembic
+        type: Directory
+    - name: backend-alembic-ini
+      hostPath:
+        path: ./backend/alembic.ini
+        type: File
+    - name: backend-pyproject
+      hostPath:
+        path: ./backend/pyproject.toml
+        type: File
+    - name: app-logs
+      hostPath:
+        path: ./logs
+        type: DirectoryOrCreate
+    - name: app-tmp
+      emptyDir:
+        medium: Memory
+
+  # ── Containers ──────────────────────────────────────────────────────────────
+  containers:
+
+    # 1. TimescaleDB + pgvector (Port 5432)
+    - name: postgres-db
+      image: docker.io/timescale/timescaledb-ha:pg16
+      env:
+        - name: PGDATA
+          value: /home/postgres/pgdata/data
+        - name: POSTGRES_USER
+          value: app_user
+        - name: POSTGRES_PASSWORD
+          value: secure_dev_password
+        - name: POSTGRES_DB
+          value: app_db
+      ports:
+        - containerPort: 5432
+          hostPort: 5432
+      volumeMounts:
+        - name: postgres-storage
+          mountPath: /home/postgres/pgdata/data
+
+    # 2. PgBouncer Connection Pooler Gateway (Port 6432)
+    - name: pgbouncer
+      image: docker.io/edoburu/pgbouncer:latest
+      env:
+        - name: DB_USER
+          value: app_user
+        - name: DB_PASSWORD
+          value: secure_dev_password
+        - name: DB_HOST
+          value: 127.0.0.1
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: app_db
+        - name: POOL_MODE
+          value: transaction
+        - name: MAX_CLIENT_CONN
+          value: "1000"
+        - name: DEFAULT_POOL_SIZE
+          value: "25"
+        - name: AUTH_TYPE
+          value: scram-sha-256
+        - name: LISTEN_PORT
+          value: "6432"
+      ports:
+        - containerPort: 6432
+          hostPort: 6432
+
+    # 3. Valkey In-Memory Key-Value & Message Broker (Port 6379)
+    - name: valkey-cache
+      image: docker.io/valkey/valkey:8-alpine
+      ports:
+        - containerPort: 6379
+          hostPort: 6379
+      volumeMounts:
+        - name: valkey-storage
+          mountPath: /data
+
+    # 4. Mailpit Local Mock SMTP Server (Port 1025 / 8025)
+    - name: mailpit
+      image: docker.io/axllent/mailpit:latest
+      ports:
+        - containerPort: 1025
+          hostPort: 1025
+        - containerPort: 8025
+          hostPort: 8025
+
+    # 5. Litestar ASGI API Engine (Port 8000)
+    - name: app
+      image: localhost/api-backend:latest
+      command:
+        - granian
+        - --interface
+        - asgi
+        - app.main:app
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        - --loop
+        - uvloop
+        - --reload
+        - --workers
+        - "2"
+        - --runtime-threads
+        - "2"
+        - --http
+        - auto
+      env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: PYTHONDONTWRITEBYTECODE
+          value: "1"
+        - name: PYTHONIOENCODING
+          value: utf-8
+        - name: DATABASE_URL
+          value: postgresql+asyncpg://app_user:secure_dev_password@127.0.0.1:6432/app_db
+        - name: DIRECT_DATABASE_URL
+          value: postgresql+asyncpg://app_user:secure_dev_password@127.0.0.1:5432/app_db
+        - name: VALKEY_HOST
+          value: 127.0.0.1
+        - name: VALKEY_PORT
+          value: "6379"
+        - name: ENVIRONMENT
+          value: development
+        - name: APP_BASE_URL
+          value: http://localhost:8000
+        - name: SECRET_KEY
+          value: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        - name: FIRST_SUPERUSER_EMAIL
+          value: admin@platform.internal
+        - name: FIRST_SUPERUSER_PASSWORD
+          value: AdminSecurePassword2026!
+      volumeMounts:
+        - name: backend-src
+          mountPath: /app/src
+        - name: backend-tests
+          mountPath: /app/tests
+        - name: backend-scripts
+          mountPath: /app/scripts
+        - name: backend-alembic
+          mountPath: /app/alembic
+        - name: backend-alembic-ini
+          mountPath: /app/alembic.ini
+        - name: backend-pyproject
+          mountPath: /app/pyproject.toml
+        - name: app-logs
+          mountPath: /app/logs
+        - name: app-tmp
+          mountPath: /tmp
+
+    # 6. SAQ Background Worker (Distributed Task Consumer)
+    - name: worker
+      image: localhost/api-backend:latest
+      command:
+        - python
+        - -m
+        - saq
+        - app.core.worker.settings
+        - --workers
+        - "4"
+      env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: PYTHONDONTWRITEBYTECODE
+          value: "1"
+        - name: PYTHONIOENCODING
+          value: utf-8
+        - name: DATABASE_URL
+          value: postgresql+asyncpg://app_user:secure_dev_password@127.0.0.1:6432/app_db
+        - name: DIRECT_DATABASE_URL
+          value: postgresql+asyncpg://app_user:secure_dev_password@127.0.0.1:5432/app_db
+        - name: VALKEY_HOST
+          value: 127.0.0.1
+        - name: VALKEY_PORT
+          value: "6379"
+        - name: ENVIRONMENT
+          value: development
+        - name: APP_BASE_URL
+          value: http://localhost:8000
+        - name: SECRET_KEY
+          value: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      volumeMounts:
+        - name: backend-src
+          mountPath: /app/src
+        - name: backend-pyproject
+          mountPath: /app/pyproject.toml
+        - name: app-logs
+          mountPath: /app/logs
+
+    # 7. Go Telemetry Ingest Bypass Microservice (Port 8001)
+    - name: telemetry-ingest
+      image: localhost/telemetry-ingest:latest
+      env:
+        - name: PORT
+          value: "8001"
+        - name: DATABASE_URL
+          value: postgres://app_user:secure_dev_password@127.0.0.1:5432/app_db?sslmode=disable
+        - name: VALKEY_HOST
+          value: 127.0.0.1
+        - name: VALKEY_PORT
+          value: "6379"
+
+    # 8. Traefik Ingress Router & Edge Mesh (Port 80 / 8080)
+    - name: traefik
+      image: docker.io/traefik:v3.3
+      args:
+        - --providers.file.filename=/etc/traefik/traefik-dev.yml
+        - --entrypoints.web.address=:80
+        - --log.level=INFO
+        - --log.format=json
+        - --accesslog=true
+        - --accesslog.format=json
+        - --api.dashboard=true
+        - --api.insecure=true
+      ports:
+        - containerPort: 80
+          hostPort: 8000
+        - containerPort: 8080
+          hostPort: 8080
+      volumeMounts:
+        - name: traefik-config
+          mountPath: /etc/traefik/traefik-dev.yml
+
+    # 9. Frontend SPA Web Interface (Port 5173)
+    - name: frontend
+      image: localhost/frontend:latest
+      ports:
+        - containerPort: 5173
+
+---
+# Persistent Storage Claims for Native Podman Pod
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: valkey-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

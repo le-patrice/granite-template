@@ -30,6 +30,7 @@ services:
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=25
       - AUTH_TYPE=scram-sha-256
+      - LISTEN_PORT=6432
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -120,7 +121,13 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONIOENCODING=utf-8
+      {% if include_pgbouncer %}
+      - DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@pgbouncer:6432/{{ postgres_db }}
+      - DIRECT_DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      {% else %}
       - DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      - DIRECT_DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      {% endif %}
       {% if include_valkey %}
       - VALKEY_HOST=valkey-cache
       - VALKEY_PORT=6379
@@ -154,8 +161,13 @@ services:
       retries: 5
       start_period: 15s
     depends_on:
+      {% if include_pgbouncer %}
+      pgbouncer:
+        condition: service_started
+      {% else %}
       postgres-db:
         condition: service_healthy
+      {% endif %}
       {% if include_valkey %}
       valkey-cache:
         condition: service_started
@@ -180,7 +192,13 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONIOENCODING=utf-8
+      {% if include_pgbouncer %}
+      - DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@pgbouncer:6432/{{ postgres_db }}
+      - DIRECT_DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      {% else %}
       - DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      - DIRECT_DATABASE_URL=postgresql+asyncpg://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}
+      {% endif %}
       {% if include_valkey %}
       - VALKEY_HOST=valkey-cache
       - VALKEY_PORT=6379
@@ -196,8 +214,13 @@ services:
       - ../backend/pyproject.toml:/app/pyproject.toml:z
       - ../logs:/app/logs:z
     depends_on:
+      {% if include_pgbouncer %}
+      pgbouncer:
+        condition: service_started
+      {% else %}
       postgres-db:
         condition: service_healthy
+      {% endif %}
       {% if include_valkey %}
       valkey-cache:
         condition: service_started
@@ -230,6 +253,36 @@ services:
       - "traefik.http.services.frontend.loadbalancer.server.port=5173"
 {% endif %}
 
+{% if include_go_telemetry %}
+  # ── Go High-Throughput Telemetry Ingestion Microservice ───────────────────
+  telemetry-ingest:
+    build:
+      context: ../services/telemetry-ingest
+      dockerfile: Containerfile
+    image: localhost/{{ project_slug }}-telemetry-ingest:latest
+    container_name: {{ project_slug }}_telemetry_ingest
+    restart: unless-stopped
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgres://{{ postgres_user }}:{{ postgres_password }}@postgres-db:5432/{{ postgres_db }}?sslmode=disable
+      {% if include_valkey %}
+      - VALKEY_HOST=valkey-cache
+      - VALKEY_PORT=6379
+      {% endif %}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      {% if include_valkey %}
+      valkey-cache:
+        condition: service_started
+      {% endif %}
+    networks:
+      - platform_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.telemetry-ingest.loadbalancer.server.port=8001"
+{% endif %}
+
   # ── TimescaleDB + pgvector ─────────────────────────────────────────────────
   postgres-db:
     {% if include_timescaledb %}
@@ -247,7 +300,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data:Z
     ports:
-      - "{{ postgres_port }}:5432"    # direct access for migrations & psql
+      - "${POSTGRES_PORT:-{{ postgres_port }}}:5432"    # direct access for migrations & psql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U {{ postgres_user }} -d {{ postgres_db }} || exit 0"]
       interval: 5s
@@ -264,7 +317,7 @@ services:
     container_name: {{ project_slug }}_valkey
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${VALKEY_PORT:-6379}:6379"
     volumes:
       - valkey_data:/data:Z
     networks:

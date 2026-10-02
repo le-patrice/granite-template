@@ -40,6 +40,7 @@ CMD [ \
     "app.main:app", \
     "--host",             "0.0.0.0", \
     "--port",             "8000", \
+    "--loop",             "uvloop", \
     "--access-log", \
     "--log-level",        "info", \
     "--workers",          "4", \

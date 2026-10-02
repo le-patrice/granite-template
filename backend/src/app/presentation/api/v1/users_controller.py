@@ -28,7 +28,10 @@ from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.postgres.user_repository import PostgresUserRepository
-from app.core.security import get_password_hash, verify_password_async
+from app.core.security import (
+    get_password_hash_async,
+    verify_password_async,
+)
 from app.domain.users.contracts import IUserRepository
 from app.domain.users.models import User
 from app.domain.users.schemas import (
@@ -82,7 +85,7 @@ class UsersController(Controller):
 
         new_user = User(
             email=data.email,
-            hashed_password=get_password_hash(data.password),
+            hashed_password=await get_password_hash_async(data.password),
             full_name=data.full_name,
             is_active=True,
             is_superuser=False,
@@ -109,7 +112,7 @@ class UsersController(Controller):
         if data.full_name is not None:
             user.full_name = data.full_name
         if data.password is not None:
-            user.hashed_password = get_password_hash(data.password)
+            user.hashed_password = await get_password_hash_async(data.password)
         if data.is_active is not None:
             user.is_active = data.is_active
         if data.is_superuser is not None:
@@ -206,7 +209,7 @@ class UsersController(Controller):
             user.full_name = data.full_name
 
         if data.password is not None:
-            user.hashed_password = get_password_hash(data.password)
+            user.hashed_password = await get_password_hash_async(data.password)
 
         updated = await user_repo.update(user)
         return _model_to_read(updated)
@@ -244,7 +247,7 @@ class UsersController(Controller):
                 status_code=400,
             )
 
-        user.hashed_password = get_password_hash(data.new_password)
+        user.hashed_password = await get_password_hash_async(data.new_password)
         await user_repo.update(user)
         return Message(message="Password updated successfully")
 
@@ -305,7 +308,7 @@ class UsersController(Controller):
 
         new_user = User(
             email=data.email,
-            hashed_password=get_password_hash(data.password),
+            hashed_password=await get_password_hash_async(data.password),
             full_name=data.full_name,
             is_active=data.is_active,
             is_superuser=data.is_superuser,

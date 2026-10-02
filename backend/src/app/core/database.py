@@ -56,6 +56,21 @@ db_config = SQLAlchemyAsyncConfig(
 alchemy_plugin = SQLAlchemyInitPlugin(config=db_config)
 
 
+import contextvars
+
+# ---------------------------------------------------------------------------
+# Request Context Variables for Database RLS Context
+# ---------------------------------------------------------------------------
+current_user_id: contextvars.ContextVar[str] = contextvars.ContextVar("current_user_id", default="")
+current_tenant_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "current_tenant_id", default=""
+)
+current_role: contextvars.ContextVar[str] = contextvars.ContextVar("current_role", default="")
+current_is_superuser: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "current_is_superuser", default=False
+)
+
+
 # ---------------------------------------------------------------------------
 # PgBouncer-Safe Tenant & Role Context Listener for PostgreSQL RLS
 # ---------------------------------------------------------------------------
@@ -68,10 +83,13 @@ def set_tenant_context(session: Session, transaction: object, connection: object
     Uses PostgreSQL set_config(..., is_local=true) which is strictly transaction-local,
     ensuring 100% safety with PgBouncer transaction-pooling mode.
     """
-    user_id = str(session.info.get("user_id") or "")
-    tenant_id = str(session.info.get("tenant_id") or "")
-    is_super = session.info.get("is_superuser", False)
-    role = str(session.info.get("role") or ("superadmin" if is_super else "guest"))
+    user_id = str(session.info.get("user_id") or current_user_id.get())
+    tenant_id = str(session.info.get("tenant_id") or current_tenant_id.get())
+    is_super = session.info.get("is_superuser")
+    if is_super is None:
+        is_super = current_is_superuser.get()
+    default_role = "superadmin" if is_super else ("user" if user_id else "guest")
+    role = str(session.info.get("role") or current_role.get() or default_role)
 
     # Execute parameterized set_config call on the active transaction connection
     connection.execute(  # type: ignore[attr-defined]

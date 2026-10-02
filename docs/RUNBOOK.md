@@ -66,7 +66,7 @@ podman exec -u 1000 -it pgbouncer_pool psql -p 6432 -U app_user -d pgbouncer -c 
 # 2. Inspect active client connection counts
 podman exec -u 1000 -it pgbouncer_pool psql -p 6432 -U app_user -d pgbouncer -c "SHOW CLIENTS;"
 
-# 3. Temporarily increase pool size in config/podman-compose.yml:
+# 3. Temporarily increase pool size in config/platform-pod.yaml or deployments/prod/quadlets/pgbouncer.container:
 #    DEFAULT_POOL_SIZE=50
 #    MAX_CLIENT_CONN=2000
 make restart SERVICE=pgbouncer

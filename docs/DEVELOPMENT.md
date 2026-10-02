@@ -9,8 +9,8 @@
 
 Ensure the following tools are installed on your workstation:
 - **Operating System:** Linux (Ubuntu 22.04+, Fedora 38+, Debian 12+, Arch Linux) or macOS with Podman Machine.
-- **Container Engine:** **Podman 4.5+ or 5.x** (configured for rootless operation) or Docker 24+.
-- **Compose Provider:** `podman-compose` or `docker-compose-plugin`.
+- **Container Engine:** **Podman 5.x** (configured for rootless operation with Pasta networking).
+- **Pod Orchestration:** Native Podman 5.x (native Pods, shared network namespace, loopback IPC; zero Compose dependency).
 - **Build & Task Automation:** GNU `make` 4.x.
 - **Scaffolding Tool:** `copier` (`pipx install copier` or `uv tool install copier`).
 - **Python Tooling:** Python 3.11+ and `uv` (optional for local editor LSP indexers).

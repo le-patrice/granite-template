@@ -35,10 +35,15 @@ import app.domain.telemetry.models  # noqa: E402, F401  – registers TelemetryR
 # ---------------------------------------------------------------------------
 config = context.config
 
-# Override sqlalchemy.url from the DATABASE_URL environment variable.
-# This keeps credentials out of alembic.ini entirely.
-database_url = os.environ.get("DATABASE_URL", "")
+# Override sqlalchemy.url from DIRECT_DATABASE_URL or DATABASE_URL.
+# Migrations execute DDL, table locks, and session-level statements which must
+# bypass PgBouncer transaction pooling (port 6432) and connect directly to Postgres (port 5432).
+database_url = os.environ.get("DIRECT_DATABASE_URL") or os.environ.get("DATABASE_URL", "")
 if database_url:
+    if "@pgbouncer:6432" in database_url:
+        database_url = database_url.replace("@pgbouncer:6432", "@postgres-db:5432")
+    elif ":6432" in database_url:
+        database_url = database_url.replace(":6432", ":5432")
     # asyncpg driver doesn't work with Alembic's sync engine; swap it out.
     sync_url = database_url.replace(
         "postgresql+asyncpg://", "postgresql+psycopg2://"

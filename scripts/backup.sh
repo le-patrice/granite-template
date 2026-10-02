@@ -55,13 +55,18 @@ BACKUP_DIR="${BACKUP_DIR:-./backups}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 DRY_RUN="${DRY_RUN:-0}"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
-COMPOSE_FILE="${COMPOSE_FILE:-config/podman-compose.yml}"
+POD_NAME="${POD_NAME:-platform-pod}"
 
-if command -v "${CONTAINER_ENGINE}-compose" &>/dev/null; then
-    COMPOSE_CMD=("${CONTAINER_ENGINE}-compose" -f "${COMPOSE_FILE}")
-else
-    COMPOSE_CMD=("${CONTAINER_ENGINE}" compose -f "${COMPOSE_FILE}")
-fi
+get_container() {
+    local name="$1"
+    if "${CONTAINER_ENGINE}" container exists "${POD_NAME}-${name}" 2>/dev/null; then
+        echo "${POD_NAME}-${name}"
+    elif "${CONTAINER_ENGINE}" container exists "${name}" 2>/dev/null; then
+        echo "${name}"
+    else
+        echo ""
+    fi
+}
 
 TIMESTAMP="$(date -u +%Y%m%d_%H%M%S)"
 PG_BACKUP_DIR="${BACKUP_DIR}/postgres"
@@ -131,9 +136,15 @@ backup_postgres() {
             "${POSTGRES_DB}"
     else
         # Run via postgres-db container (rootless Podman)
-        log_info "pg_dump not found locally — running via ${POSTGRES_DB} container"
-        dry_run_guard "${COMPOSE_CMD[@]}" \
-            exec -T postgres-db \
+        local pg_ctr
+        pg_ctr="$(get_container postgres-db)"
+        if [[ -z "${pg_ctr}" ]]; then
+            log_error "PostgreSQL container not found running"
+            exit 1
+        fi
+        log_info "pg_dump not found locally — running via ${pg_ctr} container"
+        dry_run_guard "${CONTAINER_ENGINE}" \
+            exec -i "${pg_ctr}" \
             env PGPASSWORD="${POSTGRES_PASSWORD}" \
             pg_dump \
             --username="${POSTGRES_USER}" \
@@ -144,7 +155,7 @@ backup_postgres() {
 
         # Copy the dump out of the container
         dry_run_guard "${CONTAINER_ENGINE}" cp \
-            "$("${COMPOSE_CMD[@]}" ps -q postgres-db):/tmp/${POSTGRES_DB}_${TIMESTAMP}.dump" \
+            "${pg_ctr}:/tmp/${POSTGRES_DB}_${TIMESTAMP}.dump" \
             "${outfile}"
     fi
 
@@ -190,16 +201,24 @@ backup_valkey() {
             fi
         done
     else
-        log_info "valkey-cli not found locally — triggering BGSAVE via container"
-        dry_run_guard "${COMPOSE_CMD[@]}" \
-            exec -T valkey-cache valkey-cli BGSAVE
+        local valkey_ctr
+        valkey_ctr="$(get_container valkey-cache)"
+        if [[ -z "${valkey_ctr}" ]]; then
+            log_error "Valkey container not found running"
+            exit 1
+        fi
+        log_info "valkey-cli not found locally — triggering BGSAVE via ${valkey_ctr} container"
+        dry_run_guard "${CONTAINER_ENGINE}" \
+            exec -i "${valkey_ctr}" valkey-cli BGSAVE
         sleep 3   # conservative wait when no feedback loop
     fi
 
     # Copy dump.rdb out of the container
     if [[ "${DRY_RUN}" != "1" ]]; then
+        local valkey_ctr
+        valkey_ctr="$(get_container valkey-cache)"
         "${CONTAINER_ENGINE}" cp \
-            "$("${COMPOSE_CMD[@]}" ps -q valkey-cache 2>/dev/null):/data/dump.rdb" \
+            "${valkey_ctr}:/data/dump.rdb" \
             "${outfile}" 2>/dev/null \
             || log_warn "Could not copy dump.rdb from container — Valkey may use AOF only"
         if [[ -f "${outfile}" ]]; then
@@ -261,11 +280,17 @@ restore_postgres() {
             --jobs=4 \
             "${file}"
     else
-        log_info "pg_restore not found locally — running via container"
+        local pg_ctr
+        pg_ctr="$(get_container postgres-db)"
+        if [[ -z "${pg_ctr}" ]]; then
+            log_error "PostgreSQL container not found running"
+            exit 1
+        fi
+        log_info "pg_restore not found locally — running via ${pg_ctr} container"
         local container_path="/tmp/restore_${TIMESTAMP}.dump"
         "${CONTAINER_ENGINE}" cp "${file}" \
-            "$("${COMPOSE_CMD[@]}" ps -q postgres-db):${container_path}"
-        "${COMPOSE_CMD[@]}" exec -T postgres-db \
+            "${pg_ctr}:${container_path}"
+        "${CONTAINER_ENGINE}" exec -i "${pg_ctr}" \
             env PGPASSWORD="${POSTGRES_PASSWORD}" \
             pg_restore \
             --username="${POSTGRES_USER}" \

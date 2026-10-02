@@ -193,9 +193,11 @@ class TestTransactionalOutbox:
 class TestSlidingWindowRateLimiter:
     async def test_auth_login_rate_limiting_triggers_429(self, async_client: AsyncClient):
         responses = []
+        unique_ip = f"198.51.100.{uuid.uuid4().hex[:4]}"
+        headers = {"X-Forwarded-For": unique_ip}
         payload = {"email": "ratelimit.test@example.com", "password": "WrongPassword123!"}
         for _ in range(6):
-            resp = await async_client.post("/api/v1/auth/login", json=payload)
+            resp = await async_client.post("/api/v1/auth/login", json=payload, headers=headers)
             responses.append(resp)
 
         # First 5 should not be rate-limited (401 for wrong credentials)

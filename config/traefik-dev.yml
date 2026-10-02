@@ -2,7 +2,7 @@
 # Traefik v3 — Development Static Configuration with Cloudflare Ingress
 #
 # Loaded via --providers.file.filename=/etc/traefik/traefik-dev.yml inside
-# the Traefik container (see podman-compose.yml).
+# the Traefik container (see platform-pod.yaml).
 #
 # Routing Summary
 # ---------------
@@ -50,16 +50,12 @@ entryPoints:
     http2:
       maxConcurrentStreams: 250
 
-# ── Providers: file (this file) + Docker labels ─────────────────────────────
+# ── Providers: file (this file) ─────────────────────────────────────────────
 providers:
   file:
     filename: /etc/traefik/traefik-dev.yml
     watch: true
 
-  docker:
-    endpoint: "unix:///run/podman/podman.sock"
-    exposedByDefault: false
-    network: platform_net
 
 # ── Middlewares & Routing ───────────────────────────────────────────────────
 http:
@@ -109,11 +105,23 @@ http:
   # ── Routers ────────────────────────────────────────────────────────────────
   routers:
 
+    # 0. Go Telemetry Ingest Bypass Router (High-throughput zero-copy ingestion)
+    telemetry-ingest-router:
+      entryPoints:
+        - web
+      rule: "PathPrefix(`/api/v1/telemetry/ingest`)"
+      priority: 100
+      service: telemetry-ingest-service
+      middlewares:
+        - cors-headers
+        - secure-headers
+
     # 1. API Router (Host api.* or Path /api/*)
     api-router:
       entryPoints:
         - web
       rule: "HostRegexp(`^{subdomain:(api|api-dev)\\..*}`) || PathPrefix(`/api`)"
+      priority: 66
       service: app-service
       middlewares:
         - cors-headers
@@ -125,6 +133,7 @@ http:
       entryPoints:
         - web
       rule: "HostRegexp(`^{subdomain:(docs|docs-dev)\\..*}`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`)"
+      priority: 120
       service: app-service
       middlewares:
         - cors-headers
@@ -135,6 +144,7 @@ http:
       entryPoints:
         - web
       rule: "PathPrefix(`/health`) || PathPrefix(`/metrics`)"
+      priority: 47
       service: app-service
       middlewares:
         - secure-headers
@@ -144,6 +154,7 @@ http:
       entryPoints:
         - web
       rule: "PathPrefix(`/`)"
+      priority: 15
       service: frontend-service
       middlewares:
         - secure-headers
@@ -151,16 +162,23 @@ http:
   # ── Backend Services ───────────────────────────────────────────────────────
   services:
 
-    # Litestar / Granian backend service
+    # Litestar / Granian backend service (in-pod loopback)
     app-service:
       loadBalancer:
         passHostHeader: true
         servers:
-          - url: "http://app:8000"
+          - url: "http://127.0.0.1:8000"
 
-    # Vite dev-server frontend service
+    # Go High-Throughput Telemetry Ingest Microservice (in-pod loopback)
+    telemetry-ingest-service:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://127.0.0.1:8001"
+
+    # Vite dev-server frontend service (in-pod loopback or host)
     frontend-service:
       loadBalancer:
         passHostHeader: true
         servers:
-          - url: "http://frontend:5173"
+          - url: "http://127.0.0.1:5173"

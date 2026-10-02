@@ -50,7 +50,6 @@ def upgrade() -> None:
         sa.Column(
             "id",
             sa.UUID(as_uuid=True),
-            primary_key=True,
             nullable=False,
         ),
         sa.Column("transformer_id", sa.String(128), nullable=False),
@@ -69,6 +68,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
+        sa.PrimaryKeyConstraint("id", "recorded_at"),
     )
 
     # B-Tree index on transformer_id alone (equality lookups)

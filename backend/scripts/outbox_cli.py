@@ -17,7 +17,10 @@ async def run_action(action: str) -> None:
         repo = PostgresOutboxRepository(session)
         relay = OutboxRelay(repo)
 
-        if action == "sweep":
+        if action == "listen":
+            print("🚀 Starting real-time PostgreSQL LISTEN/NOTIFY outbox relay daemon (Ctrl+C to exit)...")
+            await relay.listen_and_relay()
+        elif action == "sweep":
             count = await relay.process_sweep()
             print(f"✅ Outbox sweep complete. Relayed {count} pending events.")
         elif action == "replay":
@@ -35,7 +38,7 @@ async def run_action(action: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Transactional Outbox & DLQ CLI")
-    parser.add_argument("action", choices=["sweep", "replay", "status"], default="sweep", nargs="?")
+    parser.add_argument("action", choices=["sweep", "replay", "status", "listen"], default="sweep", nargs="?")
     args = parser.parse_args()
     asyncio.run(run_action(args.action))
 

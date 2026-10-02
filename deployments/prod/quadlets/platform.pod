@@ -1,0 +1,14 @@
+[Unit]
+Description=Enterprise Platform Native Podman Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=enterprise-platform
+PublishPort=80:80
+PublishPort=443:443
+PublishPort=8080:8080
+Network=platform.network
+
+[Install]
+WantedBy=default.target multi-user.target

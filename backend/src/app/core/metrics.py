@@ -88,8 +88,25 @@ class PrometheusMetricsMiddleware(AbstractMiddleware):
             await self.app(scope, receive, tracking_send)
         finally:
             duration = time.monotonic() - start_time
-            # Normalize path for metric cardinality
-            normalized_path = path if path.startswith(("/api", "/health")) else "/other"
+            # Normalize path for metric cardinality (avoid UUIDs or IDs leaking into label names)
+            route_handler = scope.get("route_handler")
+            if route_handler and hasattr(route_handler, "paths") and route_handler.paths:
+                normalized_path = next(iter(route_handler.paths))
+            elif path.startswith("/health"):
+                normalized_path = path
+            elif path.startswith("/api"):
+                import re
+
+                # Scrub UUIDs and numeric IDs to prevent memory leaks in Prometheus registry
+                cleaned = re.sub(
+                    r"/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+                    "/{id}",
+                    path,
+                )
+                normalized_path = re.sub(r"/\d+", "/{id}", cleaned)
+            else:
+                normalized_path = "/other"
+
             HTTP_REQUESTS_TOTAL.labels(
                 method=method,
                 path=normalized_path,

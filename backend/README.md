@@ -39,7 +39,7 @@ To generate a new auto-detected migration after modifying SQLAlchemy models:
 
 ```bash
 # Create a new migration revision inside the container
-make exec-db CMD="alembic revision --autogenerate -m 'add_entity_table'"
+make migration-create MSG="add_entity_table"
 ```
 
 ### Applying Migrations
@@ -55,7 +55,7 @@ make migrate
 
 ```bash
 # Downgrade one revision step
-make exec-db CMD="alembic downgrade -1"
+make migrate-down
 ```
 
 ---

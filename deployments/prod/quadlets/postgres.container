@@ -1,16 +1,17 @@
 [Unit]
 Description=TimescaleDB PostgreSQL Database
 After=network-online.target local-fs.target
+Wants=network-online.target
 
 [Container]
 ContainerName=postgres-db
+Pod=platform.pod
 Image=docker.io/timescale/timescaledb-ha:pg16
-Network=platform.network
 Volume=postgres.volume:/home/postgres/pgdata/data:Z
 Environment=POSTGRES_USER=app_user
 Environment=POSTGRES_PASSWORD=secure_dev_password
 Environment=POSTGRES_DB=app_db
-PublishPort=5432:5432
+Environment=PGDATA=/home/postgres/pgdata/data
 AutoUpdate=registry
 
 [Service]
@@ -18,4 +19,4 @@ Restart=always
 TimeoutStartSec=300
 
 [Install]
-WantedBy=multi-user.target default.target
+WantedBy=default.target multi-user.target

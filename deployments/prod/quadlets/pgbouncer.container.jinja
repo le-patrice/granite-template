@@ -1,0 +1,27 @@
+[Unit]
+Description=PgBouncer High-Performance PostgreSQL Connection Pooler - {{ project_name }}
+After=postgres.service
+Requires=postgres.service
+
+[Container]
+ContainerName={{ project_slug }}-pgbouncer
+Pod=platform.pod
+Image=docker.io/edoburu/pgbouncer:latest
+Environment=DB_USER={{ postgres_user }}
+Environment=DB_PASSWORD={{ postgres_password }}
+Environment=DB_HOST=127.0.0.1
+Environment=DB_PORT=5432
+Environment=DB_NAME={{ postgres_db }}
+Environment=POOL_MODE=transaction
+Environment=MAX_CLIENT_CONN=1000
+Environment=DEFAULT_POOL_SIZE=25
+Environment=AUTH_TYPE=scram-sha-256
+Environment=LISTEN_PORT=6432
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target multi-user.target

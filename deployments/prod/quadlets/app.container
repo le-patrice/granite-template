@@ -1,14 +1,17 @@
 [Unit]
-Description=Litestar Enterprise API
-After=postgres.service valkey.service
+Description=Litestar Enterprise API Engine
+After=pgbouncer.service valkey.service
+Requires=pgbouncer.service valkey.service
 
 [Container]
 ContainerName=api-backend
+Pod=platform.pod
 Image=localhost/enterprise-platform:latest
-PublishPort=8000:8000
-Network=platform.network
 EnvironmentFile=/etc/platform/app.env
-Exec=granian --interface asgi app:app --host 0.0.0.0 --port 8000 --workers 4 --runtime-threads 2 --http auto --backlog 1024
+Exec=granian --interface asgi app.main:app --host 127.0.0.1 --port 8000 --loop uvloop --workers 4 --runtime-threads 2 --http auto --backlog 1024
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=128m
+Volume=/var/log/platform:/app/logs:Z
 AutoUpdate=registry
 
 [Service]
@@ -16,4 +19,4 @@ Restart=always
 TimeoutStartSec=300
 
 [Install]
-WantedBy=multi-user.target default.target
+WantedBy=default.target multi-user.target

@@ -57,7 +57,6 @@ class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
-        self.valkey = get_valkey_pool()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

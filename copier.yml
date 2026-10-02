@@ -3,6 +3,21 @@
 # ==============================================================================
 _min_copier_version: "9.0.0"
 _subdirectory: ""
+_exclude:
+  - "copier.yaml"
+  - "copier.yml"
+  - "~*"
+  - "*.py[co]"
+  - "__pycache__"
+  - ".git"
+  - ".DS_Store"
+  - ".ruff_cache"
+  - "references"
+  - "references/**"
+  - "{% if not enable_quadlets %}deployments/prod/quadlets/**{% endif %}"
+  - "{% if not include_frontend %}frontend/**{% endif %}"
+  - "{% if not include_frontend %}deployments/prod/quadlets/frontend.container*{% endif %}"
+  - "{% if not include_go_telemetry %}services/telemetry-ingest/**{% endif %}"
 
 # ------------------------------------------------------------------------------
 # Project Identity & Metadata
@@ -62,6 +77,11 @@ app_port:
   help: "Public API port (host bound)"
   default: 8000
 
+enable_quadlets:
+  type: bool
+  help: "Generate rootless systemd Quadlet declarative units (platform.pod, *.container, *.volume) for native production orchestration"
+  default: true
+
 # ------------------------------------------------------------------------------
 # API Documentation & Interactive UI Selection
 # ------------------------------------------------------------------------------
@@ -107,7 +127,12 @@ include_pgvector:
 include_pgbouncer:
   type: bool
   help: "Include PgBouncer connection pooler gateway container for high-concurrency scaling"
-  default: false
+  default: true
+
+include_go_telemetry:
+  type: bool
+  help: "Include compiled Go high-throughput telemetry ingestion bypass microservice (POST /api/v1/telemetry/ingest)"
+  default: true
 
 # ------------------------------------------------------------------------------
 # Cache, Background Processing & Resilience

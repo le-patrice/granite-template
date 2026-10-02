@@ -85,7 +85,8 @@ async def ensure_db_schema(async_engine):
         try:
             await conn.execute(
                 text(
-                    "TRUNCATE platform_users, telemetry_readings, outbox_events, dead_letter_events, audit_logs CASCADE;"
+                    "DELETE FROM platform_users WHERE is_superuser = false; "
+                    "TRUNCATE telemetry_readings, outbox_events, dead_letter_events, audit_logs CASCADE;"
                 )
             )
         except Exception:  # noqa: S110, BLE001

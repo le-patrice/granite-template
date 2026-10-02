@@ -3,7 +3,6 @@
 # ==============================================================================
 
 SHELL := /bin/bash
-export PODMAN_COMPOSE_WARNING_LOGS := 0
 .DEFAULT_GOAL := help
 
 # ------------------------------------------------------------------------------
@@ -21,18 +20,15 @@ NC     := \033[0m # No Color
 # Configurable Runtime Variables (Weak Assignments)
 # ------------------------------------------------------------------------------
 CONTAINER_ENGINE ?= podman
-COMPOSE_FILE     ?= -f config/podman-compose.yml
+KUBE_POD_FILE    ?= config/platform-pod.yaml
+POD_NAME         ?= platform-pod
 ENV_FILE         ?= --env-file .env
-PROJECT_NAME     ?= $(shell grep -E '^COMPOSE_PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 | tr -d ' "' || echo "enterprise")
 
-# Socket context for rootless Podman execution
-export CONTAINER_HOST ?= unix:///run/user/$(shell id -u)/podman/podman.sock
-
-# Execution wrappers
-COMPOSE_BASE  := $(CONTAINER_ENGINE) compose $(ENV_FILE) $(COMPOSE_FILE)
-EXEC_APP      := $(COMPOSE_BASE) exec -T app 2>/dev/null || $(CONTAINER_ENGINE) exec -u 10001 -i $(PROJECT_NAME)_backend
-EXEC_DB       := $(COMPOSE_BASE) exec -T postgres-db 2>/dev/null || $(CONTAINER_ENGINE) exec -u 1000 -i $(PROJECT_NAME)_postgres
-EXEC_FRONTEND := $(COMPOSE_BASE) exec -T frontend 2>/dev/null || $(CONTAINER_ENGINE) exec -i $(PROJECT_NAME)_frontend
+# Execution wrappers — Pure Podman 5 native pod container execution
+EXEC_APP        = $(CONTAINER_ENGINE) exec -i $(POD_NAME)-app
+EXEC_DB         = $(CONTAINER_ENGINE) exec -i $(POD_NAME)-postgres-db
+EXEC_FRONTEND   = $(CONTAINER_ENGINE) exec -i $(POD_NAME)-frontend
+EXEC_TELEMETRY  = $(CONTAINER_ENGINE) exec -i $(POD_NAME)-telemetry-ingest
 
 
 # Command argument overrides
@@ -143,103 +139,132 @@ prod: prod-up ## Production Stack Launch: start all services with Cloudflare tun
 # ------------------------------------------------------------------------------
 # Stack Lifecycle Management
 # ------------------------------------------------------------------------------
-.PHONY: up
-up: ## Start all core mesh services (App, Worker, PostgreSQL, Valkey, Traefik) in background
-	@echo -e "$(BLUE)Starting services with $(CONTAINER_ENGINE)...$(NC)"
-	@$(COMPOSE_BASE) up -d
-	@echo -e "$(GREEN)✅ Stack running. API available at http://localhost:8000$(NC)"
+.PHONY: up pod-up
+up: ## Start all core mesh services in a native Podman Pod (Pasta network + localhost IPC)
+	@echo -e "$(BLUE)Starting native Podman Pod ($(KUBE_POD_FILE))...$(NC)"
+	@if ! $(CONTAINER_ENGINE) image exists localhost/api-backend:latest 2>/dev/null || ! $(CONTAINER_ENGINE) image exists localhost/frontend:latest 2>/dev/null; then \
+		echo -e "$(YELLOW)Local container images missing. Triggering automated build...$(NC)"; \
+		$(MAKE) build; \
+	fi
+	@sed "s|path: \./|path: $$PWD/|g" $(KUBE_POD_FILE) | $(CONTAINER_ENGINE) kube play --replace -
+	@echo -e "$(GREEN)✅ Stack running. Web UI at http://localhost:8000 | API Docs at http://localhost:8000/docs$(NC)"
 
 .PHONY: prod-up
-prod-up: ## Start full production stack including Cloudflare tunnel
-	@echo -e "$(BLUE)Starting full production stack with Cloudflare tunnel...$(NC)"
-	@$(COMPOSE_BASE) --profile production up -d
-	@echo -e "$(GREEN)✅ Production stack and Cloudflare tunnel started$(NC)"
+prod-up: up ## Start full production stack via native Podman Pod
+	@echo -e "$(GREEN)✅ Production stack active$(NC)"
 
 .PHONY: prod-logs
-prod-logs: ## Stream production container logs including tunnel
-	@echo -e "$(YELLOW)Streaming production stack logs (including Cloudflare tunnel)...$(NC)"
-	@$(COMPOSE_BASE) --profile production logs -f
+prod-logs: logs ## Stream production container logs
 
 .PHONY: up-dev
-up-dev: ## Rebuild and start container mesh in background with live volume mounts
-	@echo -e "$(BLUE)Building and starting development stack...$(NC)"
-	@$(COMPOSE_BASE) up -d --build
-	@echo -e "$(GREEN)✅ Development stack started$(NC)"
+up-dev: build up ## Rebuild and restart native Podman Pod mesh
 
 .PHONY: worker
-worker: ## Start or ensure background task worker container is running
-	@echo -e "$(BLUE)Starting SAQ background worker container...$(NC)"
-	@$(COMPOSE_BASE) up -d worker
-	@echo -e "$(GREEN)✅ SAQ worker container is active$(NC)"
+worker: ## Check or display status of background worker container in pod
+	@$(CONTAINER_ENGINE) ps --filter name=$(POD_NAME)-worker
 
 .PHONY: worker-logs
 worker-logs: ## Tail live logs from SAQ distributed background task worker
 	@echo -e "$(BLUE)Tailing SAQ background worker logs...$(NC)"
-	@$(COMPOSE_BASE) logs -f --tail=200 worker
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-worker
 
-.PHONY: down
-down: ## Stop and remove stack containers (preserves database volumes)
-	@echo -e "$(YELLOW)Stopping stack containers...$(NC)"
-	@$(COMPOSE_BASE) stop -t 5 2>/dev/null || true
-	@$(COMPOSE_BASE) down 2>/dev/null || ( \
-		podman unshare -- killall -9 slirp4netns pasta 2>/dev/null || true; \
-		$(COMPOSE_BASE) down 2>/dev/null || true \
-	)
-	@echo -e "$(GREEN)✅ Containers stopped cleanly (Database volumes preserved)$(NC)"
+.PHONY: down pod-down
+down: ## Stop and remove stack pod/containers (preserves persistent volumes)
+	@echo -e "$(YELLOW)Stopping stack...$(NC)"
+	@if [ -f "$(KUBE_POD_FILE)" ]; then \
+		sed "s|path: \./|path: $$PWD/|g" $(KUBE_POD_FILE) | $(CONTAINER_ENGINE) kube down - 2>/dev/null || $(CONTAINER_ENGINE) pod rm -f $(POD_NAME) 2>/dev/null || true; \
+	else \
+		$(CONTAINER_ENGINE) pod rm -f $(POD_NAME) 2>/dev/null || true; \
+	fi
+	@echo -e "$(GREEN)✅ Containers stopped cleanly (Persistent volumes preserved)$(NC)"
 
 .PHONY: down-volumes
 down-volumes: ## Stop stack and PERMANENTLY DESTROY all database data volumes
 	@echo -e "$(RED)⚠️  WARNING: Deleting all persistent database and cache volumes!$(NC)"
-	@$(COMPOSE_BASE) down -v
+	@if [ -f "$(KUBE_POD_FILE)" ]; then \
+		sed "s|path: \./|path: $$PWD/|g" $(KUBE_POD_FILE) | $(CONTAINER_ENGINE) kube down --force - 2>/dev/null || true; \
+	fi
+	@$(CONTAINER_ENGINE) pod rm -f $(POD_NAME) 2>/dev/null || true
+	@$(CONTAINER_ENGINE) volume rm -f postgres-data valkey-data postgres_data valkey_data 2>/dev/null || true
 	@echo -e "$(GREEN)✅ Containers and persistent volumes wiped clean$(NC)"
 
 .PHONY: down-check
 down-check: ## Stop project and verify no lingering containers remain on host
-	@$(COMPOSE_BASE) down
 	@echo -e "$(YELLOW)Checking for remaining project containers...$(NC)"
-	@$(CONTAINER_ENGINE) ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E 'app|worker|postgres|valkey|traefik|pgbouncer' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
+	@$(CONTAINER_ENGINE) ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E 'platform-pod|app|worker|postgres|valkey|traefik|pgbouncer|telemetry' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
 
 .PHONY: stop
 stop: ## Stop all services or a specific target (e.g., make stop SERVICE=app)
-	@$(COMPOSE_BASE) stop $(SERVICE)
+	@if [ -n "$(SERVICE)" ] && [ "$(SERVICE)" != "app" ]; then \
+		$(CONTAINER_ENGINE) stop $(POD_NAME)-$(SERVICE) 2>/dev/null || $(CONTAINER_ENGINE) stop $(SERVICE); \
+	elif [ "$(SERVICE)" = "app" ] && [ "$(origin SERVICE)" = "command line" ]; then \
+		$(CONTAINER_ENGINE) stop $(POD_NAME)-app; \
+	else \
+		$(CONTAINER_ENGINE) pod stop $(POD_NAME); \
+	fi
 
 .PHONY: start
 start: ## Start stopped services (e.g., make start SERVICE=app)
-	@$(COMPOSE_BASE) start $(SERVICE)
+	@if [ -n "$(SERVICE)" ] && [ "$(SERVICE)" != "app" ]; then \
+		$(CONTAINER_ENGINE) start $(POD_NAME)-$(SERVICE) 2>/dev/null || $(CONTAINER_ENGINE) start $(SERVICE); \
+	elif [ "$(SERVICE)" = "app" ] && [ "$(origin SERVICE)" = "command line" ]; then \
+		$(CONTAINER_ENGINE) start $(POD_NAME)-app; \
+	else \
+		$(CONTAINER_ENGINE) pod start $(POD_NAME); \
+	fi
 
 .PHONY: restart
 restart: ## Restart services (e.g., make restart SERVICE=app)
 	@echo -e "$(YELLOW)Restarting service: $(SERVICE)...$(NC)"
-	@$(COMPOSE_BASE) restart $(SERVICE)
+	@if [ -n "$(SERVICE)" ] && [ "$(SERVICE)" != "app" ]; then \
+		$(CONTAINER_ENGINE) restart $(POD_NAME)-$(SERVICE) 2>/dev/null || $(CONTAINER_ENGINE) restart $(SERVICE); \
+	elif [ "$(SERVICE)" = "app" ] && [ "$(origin SERVICE)" = "command line" ]; then \
+		$(CONTAINER_ENGINE) restart $(POD_NAME)-app; \
+	else \
+		$(CONTAINER_ENGINE) pod restart $(POD_NAME); \
+	fi
 	@echo -e "$(GREEN)✅ Restart complete$(NC)"
 
 # ------------------------------------------------------------------------------
 # Observability & Live Log Streaming
 # ------------------------------------------------------------------------------
-.PHONY: logs
-logs: ## Stream live logs from all stack containers in real time
+.PHONY: logs log
+log: logs
+logs: ## Stream live logs from all stack containers in real time (pure Podman pod logs)
 	@echo -e "$(YELLOW)Streaming live stack logs (Ctrl+C to exit)...$(NC)"
-	@$(COMPOSE_BASE) logs -f --tail=100
+	@env -u CONTAINER_HOST $(CONTAINER_ENGINE) pod logs -f --names --color $(POD_NAME)
 
 .PHONY: logs-api
 logs-api: ## Stream live logs specifically from the Litestar backend API
-	@$(COMPOSE_BASE) logs -f --tail=100 app
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-app
+
+.PHONY: logs-telemetry
+logs-telemetry: ## Stream live logs from Go high-throughput telemetry ingestion bypass service
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-telemetry-ingest
 
 .PHONY: logs-frontend
 logs-frontend: ## Stream live logs from Vite frontend dev server
-	@$(COMPOSE_BASE) logs -f --tail=100 frontend
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-frontend
 
 .PHONY: logs-worker
 logs-worker: ## Stream live logs from the SAQ background worker
-	@$(COMPOSE_BASE) logs -f --tail=100 worker
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-worker
 
 .PHONY: logs-db
 logs-db: ## Stream live logs from PostgreSQL / TimescaleDB
-	@$(COMPOSE_BASE) logs -f --tail=100 postgres-db
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-postgres-db
 
 .PHONY: logs-traefik
 logs-traefik: ## Stream live access logs from the Traefik edge proxy
-	@$(COMPOSE_BASE) logs -f --tail=100 traefik
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-traefik
+
+.PHONY: logs-valkey
+logs-valkey: ## Stream live logs from Valkey cache container
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-valkey-cache
+
+.PHONY: logs-pgbouncer
+logs-pgbouncer: ## Stream live logs from PgBouncer connection pooler
+	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-pgbouncer
 
 .PHONY: clean-logs
 clean-logs: ## Recreate containers to flush stale log output
@@ -249,8 +274,15 @@ clean-logs: ## Recreate containers to flush stale log output
 	@echo -e "$(GREEN)✅ Clean stack running with empty log buffers$(NC)"
 
 .PHONY: ps
-ps: ## List status of all mesh containers
-	@$(COMPOSE_BASE) ps
+ps: ## List status of all mesh containers / pod
+	@if $(CONTAINER_ENGINE) pod exists $(POD_NAME) 2>/dev/null; then \
+		echo -e "$(BLUE)$(BOLD)Pod Status:$(NC)"; \
+		$(CONTAINER_ENGINE) pod ps --filter name=$(POD_NAME); \
+		echo -e "\n$(CYAN)$(BOLD)Pod Containers:$(NC)"; \
+		$(CONTAINER_ENGINE) ps -a --filter pod=$(POD_NAME) --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Image}}"; \
+	else \
+		$(CONTAINER_ENGINE) ps -a; \
+	fi
 
 .PHONY: health
 health: ## Perform HTTP health check against local Litestar instance
@@ -266,30 +298,69 @@ stats: ## Stream real-time resource utilization (CPU, Memory, I/O)
 	@$(CONTAINER_ENGINE) stats --no-stream
 
 .PHONY: shell
-shell: ## Open an interactive bash shell inside container (e.g., make shell SERVICE=app)
-	@$(COMPOSE_BASE) exec $(SERVICE) bash
+shell: ## Open an interactive shell inside container (e.g., make shell SERVICE=app)
+	@if $(CONTAINER_ENGINE) container exists $(POD_NAME)-$(SERVICE) 2>/dev/null; then \
+		$(CONTAINER_ENGINE) exec -it $(POD_NAME)-$(SERVICE) sh; \
+	elif $(CONTAINER_ENGINE) container exists $(SERVICE) 2>/dev/null; then \
+		$(CONTAINER_ENGINE) exec -it $(SERVICE) sh; \
+	else \
+		echo -e "$(RED)Container $(POD_NAME)-$(SERVICE) not found$(NC)"; \
+	fi
 
 # ------------------------------------------------------------------------------
 # Container Image Builds
 # ------------------------------------------------------------------------------
 .PHONY: build
-build: ## Build standard container images defined in Compose
-	@echo -e "$(BLUE)Building images with $(CONTAINER_ENGINE)...$(NC)"
-	@$(COMPOSE_BASE) build
+build: build-backend build-telemetry build-frontend ## Build backend, telemetry, and frontend container images
 
 .PHONY: build-backend
-build-backend: ## Build only the backend container image from root context
+build-backend: ## Build backend container image from backend context
 	@echo -e "$(BLUE)Building backend image (config/Containerfile)...$(NC)"
-	@$(CONTAINER_ENGINE) build -t api-backend -f config/Containerfile .
+	@$(CONTAINER_ENGINE) build -t api-backend:latest -t localhost/api-backend:latest -t localhost/enterprise-platform:latest -t localhost/enterprise-platform-app:latest -f config/Containerfile backend/
 	@echo -e "$(GREEN)✅ Backend build finished$(NC)"
+
+.PHONY: build-telemetry
+build-telemetry: ## Build Go telemetry ingest bypass microservice container image
+	@echo -e "$(BLUE)Building Go telemetry ingest microservice (services/telemetry-ingest/Containerfile)...$(NC)"
+	@$(CONTAINER_ENGINE) build -t telemetry-ingest:latest -t localhost/telemetry-ingest:latest -t localhost/enterprise-platform-telemetry-ingest:latest -f services/telemetry-ingest/Containerfile services/telemetry-ingest/
+	@echo -e "$(GREEN)✅ Telemetry ingest build finished$(NC)"
+
+.PHONY: build-frontend
+build-frontend: ## Build production frontend container image
+	@echo -e "$(BLUE)Building frontend image (frontend/Containerfile)...$(NC)"
+	@if [ -d "frontend" ]; then \
+		$(CONTAINER_ENGINE) build -t frontend:latest -t localhost/frontend:latest -t localhost/enterprise-platform-frontend:latest -f frontend/Containerfile frontend/; \
+		echo -e "$(GREEN)✅ Frontend container build finished$(NC)"; \
+	else \
+		echo -e "$(YELLOW)Frontend directory not present. Skipping frontend image build.$(NC)"; \
+	fi
 
 .PHONY: build-backend-clean
 build-backend-clean: ## Build backend container with no cache
-	@$(CONTAINER_ENGINE) build --no-cache -t api-backend -f config/Containerfile .
+	@$(CONTAINER_ENGINE) build --no-cache -t api-backend:latest -t localhost/api-backend:latest -t localhost/enterprise-platform:latest -t localhost/enterprise-platform-app:latest -f config/Containerfile backend/
+
+.PHONY: build-frontend-clean
+build-frontend-clean: ## Build frontend container with no cache
+	@if [ -d "frontend" ]; then \
+		$(CONTAINER_ENGINE) build --no-cache -t frontend:latest -t localhost/frontend:latest -t localhost/enterprise-platform-frontend:latest -f frontend/Containerfile frontend/; \
+	fi
 
 .PHONY: pull
-pull: ## Pull latest base images (TimescaleDB, Valkey) from registries
-	@$(COMPOSE_BASE) pull
+pull: ## Pull latest base images (TimescaleDB, Valkey, Traefik, Nginx) from registries
+	@echo -e "$(YELLOW)Pulling latest base images...$(NC)"
+	@$(CONTAINER_ENGINE) pull docker.io/timescale/timescaledb-ha:pg16
+	@$(CONTAINER_ENGINE) pull docker.io/edoburu/pgbouncer:latest
+	@$(CONTAINER_ENGINE) pull docker.io/valkey/valkey:8-alpine
+	@$(CONTAINER_ENGINE) pull docker.io/library/traefik:v3.3
+	@$(CONTAINER_ENGINE) pull docker.io/nginxinc/nginx-unprivileged:alpine
+	@$(CONTAINER_ENGINE) pull docker.io/axllent/mailpit:latest
+	@echo -e "$(GREEN)✅ Base images updated$(NC)"
+
+.PHONY: quadlet-dryrun
+quadlet-dryrun: ## Validate production Systemd Quadlet unit generation without mutating host
+	@echo -e "$(YELLOW)Dry-running systemd Quadlet generator...$(NC)"
+	@QUADLET_UNIT_DIRS=$$PWD/deployments/prod/quadlets /usr/lib/systemd/system-generators/podman-system-generator -user -dryrun
+	@echo -e "$(GREEN)✅ Quadlet generator completed successfully (All units valid)$(NC)"
 
 # ------------------------------------------------------------------------------
 # Database & Migration Operations
@@ -336,6 +407,11 @@ db-shell: ## Open direct interactive psql console on running PostgreSQL containe
 outbox-relay: ## Perform a manual sweep to relay pending outbox events to message broker
 	@echo -e "$(BLUE)Sweeping pending outbox events...$(NC)"
 	@$(EXEC_APP) python scripts/outbox_cli.py sweep
+
+.PHONY: outbox-listen
+outbox-listen: ## Run real-time event-driven PostgreSQL LISTEN/NOTIFY outbox daemon (sub-2ms dispatch)
+	@echo -e "$(BLUE)Starting real-time PostgreSQL LISTEN/NOTIFY outbox relay daemon...$(NC)"
+	@$(EXEC_APP) python scripts/outbox_cli.py listen
 
 .PHONY: dlq-replay
 dlq-replay: ## Replay quarantined events from Dead Letter Queue back to Outbox
@@ -429,15 +505,15 @@ frontend-build: ## Build production frontend distribution bundle inside containe
 .PHONY: tunnel-status
 tunnel-status: ## Check Cloudflare Tunnel container health and status
 	@echo -e "$(YELLOW)Checking Cloudflare Tunnel status...$(NC)"
-	@$(COMPOSE_BASE) ps cloudflared
+	@$(CONTAINER_ENGINE) ps --filter name=cloudflared
 
 .PHONY: tunnel-logs
 tunnel-logs: ## Tail live logs from the Cloudflare Tunnel container
-	@$(COMPOSE_BASE) logs -f --tail=200 cloudflared
+	@$(CONTAINER_ENGINE) logs -f cloudflared
 
 .PHONY: tunnel-restart
 tunnel-restart: ## Restart the Cloudflare Tunnel container
-	@$(COMPOSE_BASE) restart cloudflared
+	@$(CONTAINER_ENGINE) restart cloudflared
 
 # ------------------------------------------------------------------------------
 # Quality Assurance & Testing

@@ -14,20 +14,23 @@ In production, the platform runs as a collection of declarative **Systemd Quadle
 flowchart TD
     subgraph Edge & Security
         CF[Cloudflare Edge Network] -->|Outbound Encrypted Tunnel| Tunnel[cloudflared Quadlet]
-        Tunnel -->|HTTP :80| Traefik[Traefik v3 Quadlet :80]
+        Tunnel -->|HTTP :80| Traefik[Traefik v3 Ingress Quadlet :80]
     end
 
-    subgraph Application & Worker
-        Traefik -->|api.*, /api/*, /docs| App[Litestar / Granian Quadlet :8000]
+    subgraph Native_Podman_Pod ["Native Podman Pod (platform.pod Loopback)"]
+        Traefik -->|POST /api/v1/telemetry/ingest| GoIngest[Go Telemetry Ingest Quadlet :8001]
+        Traefik -->|api.*, /api/*, /docs, /health| App[Litestar / Granian + uvloop Quadlet :8000]
         Traefik -->|app.*, /*| Frontend[Nginx Static SPA Quadlet :8080]
         Worker[SAQ Distributed Worker Quadlet]
-    end
+        OutboxRelay[PostgreSQL LISTEN/NOTIFY Outbox Relay Daemon]
 
-    subgraph Data & Caching
         App -->|Port 6432| PgBouncer[PgBouncer Quadlet :6432]
         Worker -->|Port 6432| PgBouncer
         PgBouncer -->|Port 5432| DB[(TimescaleDB HA Quadlet :5432)]
-        App -->|Port 6379| VK[(Valkey 8 Quadlet :6379)]
+        GoIngest -->|Direct Port 5432| DB
+        OutboxRelay -->|Dedicated Direct Port 5432| DB
+        OutboxRelay -->|Sub-2ms Pub/Sub| VK[(Valkey 8 Quadlet :6379)]
+        App -->|Port 6379| VK
         Worker -->|Port 6379| VK
     end
 ```
@@ -66,19 +69,28 @@ Cloudflare Tunnels eliminate the need to open incoming firewall ports (80/443) o
 
 ---
 
-## 3. PgBouncer Connection Pooling
+## 3. Database Connection Architecture & Collision Prevention
 
-PgBouncer operates in **Transaction Pooling Mode** (`POOL_MODE=transaction`) to support thousands of concurrent client requests over a lean pool of 25–50 physical PostgreSQL connections.
+To reconcile high-concurrency throughput with stateful database operations and prevent collisions with existing host databases, the platform enforces strict connection tiering and network namespace isolation:
 
-### PgBouncer Configuration Parameters
-- **Gateway Port:** `6432`
-- **Max Client Connections:** `1000`
-- **Default Pool Size:** `25`
-- **Auth Type:** `scram-sha-256`
-- **Connection URL:** `postgresql+asyncpg://app_user:password@pgbouncer:6432/app_db`
+### 3.1 Dual-Connection Strategy (Transaction Pooling vs Direct)
+- **Standard Transaction Queries (`DATABASE_URL` on port `6432`):**
+  All standard Litestar HTTP requests and transactional CRUD endpoints connect via **PgBouncer** in transaction pooling mode. PgBouncer multiplexes thousands of incoming client requests over a lean pool of 20–25 server connections, preventing PostgreSQL backend process exhaustion.
+  ```ini
+  DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@127.0.0.1:6432/app_db
+  ```
+- **Stateful Direct Connection (`DIRECT_DATABASE_URL` on port `5432`):**
+  Operations that require persistent, session-level database locks or state bypass PgBouncer and connect directly to TimescaleDB:
+  1. **PostgreSQL LISTEN/NOTIFY Outbox Relay:** PgBouncer in transaction mode rips connections away upon transaction commit, which silently breaks `LISTEN` channels. The outbox relay daemon connects directly to port `5432` to maintain an unbroken TCP stream.
+  2. **Alembic DDL Migrations (`make migrate`):** DDL statements, table alters, advisory locks, and migration transactions execute directly on port `5432`.
+  3. **High-Throughput Go Telemetry Ingest:** The Go ingest microservice connects directly to port `5432` for microsecond COPY/batch inserts.
+  ```ini
+  DIRECT_DATABASE_URL=postgresql+asyncpg://app_user:secure_dev_password@127.0.0.1:5432/app_db
+  ```
 
-> [!NOTE]
-> Database migrations (`make migrate`) and DDL scripts always connect directly to PostgreSQL on port `5432` to ensure full session-level DDL lock support.
+### 3.2 Production Database Collision Prevention
+When deploying to a production host that already runs an existing native PostgreSQL cluster or multiple projects:
+- **Network Isolation:** In both development (`config/platform-pod.yaml`) and production Quadlet pods, internal services bind to `127.0.0.1` inside the pod namespace. Internal ports (`5432`, `6432`, `6379`) are completely isolated and never conflict with host PostgreSQL or Redis instances. Direct host access can be mapped if desired via `.env` parameterization.
 
 ---
 
@@ -105,38 +117,57 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ---
 
-## 5. Systemd Quadlets (Declarative Rootless Units)
+## 5. Systemd Quadlets (Native Podman Pod & Orchestration)
 
-Production containers are deployed as user systemd units under `~/.config/containers/systemd/`.
+Production containers are deployed as declarative **Systemd Quadlet units** under `~/.config/containers/systemd/` (or `/etc/containers/systemd/` for system-wide services).
 
 ### Directory Layout
 ```
 ~/.config/containers/systemd/
-├── platform-network.network
-├── postgres-volume.volume
-├── valkey-volume.volume
-├── postgres.container
-├── valkey.container
-├── pgbouncer.container
-├── app.container
-├── worker.container
-├── frontend.container
-└── traefik.container
+├── platform.pod                        # Native Pod definition (shared network & cgroups)
+├── platform-network.network             # User bridge network with DNS
+├── postgres.volume                     # Persistent volume for TimescaleDB data
+├── valkey.volume                       # Persistent volume for Valkey data
+├── postgres.container                  # TimescaleDB 16 + pgvector container
+├── pgbouncer.container                 # PgBouncer transaction pooling gateway
+├── valkey.container                    # Valkey 8 in-memory store & Pub/Sub
+├── traefik.container                   # Traefik v3 ingress reverse proxy
+├── app.container                       # Litestar + Granian (Rust) + uvloop API
+├── worker.container                    # SAQ background task worker & outbox sweeper
+└── telemetry-ingest.container          # Compiled Go bypass ingest microservice
 ```
 
-### Sample Unit: `app.container`
+### Sample Native Pod Unit: `platform.pod`
 ```ini
 [Unit]
-Description=LiteForge API Engine (Granian Rust ASGI)
-After=network-online.target postgres.service valkey.service pgbouncer.service
-Requires=platform-network-network.service
+Description=Enterprise Platform Native Podman Pod
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=enterprise-platform
+PublishPort=80:80
+PublishPort=443:443
+PublishPort=8080:8080
+Network=platform.network
+
+[Install]
+WantedBy=default.target multi-user.target
+```
+
+### Sample Container Unit: `app.container`
+```ini
+[Unit]
+Description=Enterprise Platform API Engine (Litestar + Granian + uvloop)
+After=platform-pod.service postgres.service valkey.service pgbouncer.service
+Wants=platform-pod.service
 
 [Container]
-Image=registry.example.com/granite/backend:latest
 ContainerName=backend
+Pod=platform.pod
+Image=docker.io/library/enterprise-backend:latest
 EnvironmentFile=/etc/platform/app.env
-Network=platform-network.network
-ExposeHostPort=8000:8000
+Exec=granian --interface asgi app.main:app --host 127.0.0.1 --port 8000 --loop uvloop
 AutoUpdate=registry
 
 [Service]
@@ -145,19 +176,22 @@ RestartSec=5s
 TimeoutStartSec=120s
 
 [Install]
-WantedBy=default.target
+WantedBy=default.target multi-user.target
 ```
 
 ### Enabling and Starting Production Quadlets
 ```bash
-# Reload systemd user daemon to recognize new Quadlet units
+# 1. Generate and inspect systemd units from Quadlets
 systemctl --user daemon-reload
 
-# Enable and start the full production mesh
-systemctl --user enable --now platform-network-network.service
-systemctl --user enable --now postgres.service valkey.service pgbouncer.service
-systemctl --user enable --now app.service worker.service frontend.service traefik.service
+# 2. Verify generated service units
+systemctl --user status platform-pod.service
 
-# Enable automated registry update timer
-systemctl --user enable --now podman-auto-update.timer
+# 3. Enable and start the entire pod mesh
+systemctl --user enable --now platform-pod.service
+systemctl --user enable --now postgres.service valkey.service pgbouncer.service
+systemctl --user enable --now app.service worker.service telemetry-ingest.service traefik.service
+
+# 4. View unified journal logs
+journalctl --user -u app.service -f
 ```

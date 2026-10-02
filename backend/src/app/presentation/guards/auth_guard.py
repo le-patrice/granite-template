@@ -68,6 +68,19 @@ class JWTAuthGuard:
         connection.scope["tenant_id"] = tenant_id or ""
         connection.scope["role"] = role
 
+        # Propagate identity to contextvars for database RLS & audit triggers
+        from app.core.database import (
+            current_is_superuser,
+            current_role,
+            current_tenant_id,
+            current_user_id,
+        )
+
+        current_user_id.set(user_id)
+        current_tenant_id.set(tenant_id or "")
+        current_role.set(role)
+        current_is_superuser.set(is_super)
+
 
 jwt_auth_guard = JWTAuthGuard()
 

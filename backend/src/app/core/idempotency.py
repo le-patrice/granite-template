@@ -16,7 +16,6 @@ Lifecycle:
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import structlog
 from litestar.datastructures import MutableScopeHeaders
@@ -25,7 +24,7 @@ from litestar.middleware.base import AbstractMiddleware
 from litestar.status_codes import HTTP_409_CONFLICT
 from litestar.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.core.settings import settings
+from app.core.cache import get_valkey_pool
 
 logger = structlog.get_logger()
 
@@ -39,6 +38,7 @@ class IdempotencyMiddleware(AbstractMiddleware):
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
+        self.valkey_client = get_valkey_pool()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != ScopeType.HTTP or scope["method"] not in ("POST", "PUT", "PATCH"):
@@ -53,7 +53,7 @@ class IdempotencyMiddleware(AbstractMiddleware):
             return
 
         cache_key = f"idempotency:{idempotency_key}"
-        valkey_client = await self._get_valkey()
+        valkey_client = self.valkey_client
 
         if valkey_client is not None:
             try:
@@ -129,19 +129,6 @@ class IdempotencyMiddleware(AbstractMiddleware):
                 await valkey_client.set(cache_key, json.dumps(record), ex=IDEMPOTENCY_TTL_SECONDS)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("idempotency.cache_save_error", error=str(exc))
-
-    async def _get_valkey(self) -> Any:
-        try:
-            import valkey.asyncio as valkey
-
-            return valkey.Valkey(
-                host=settings.VALKEY_HOST,
-                port=settings.VALKEY_PORT,
-                decode_responses=True,
-                socket_timeout=2.0,
-            )
-        except Exception:  # noqa: BLE001
-            return None
 
     async def _send_json_response(self, send: Send, status_code: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")

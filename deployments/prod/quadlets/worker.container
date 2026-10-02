@@ -1,0 +1,22 @@
+[Unit]
+Description=SAQ Distributed Task Worker
+After=pgbouncer.service valkey.service
+Requires=pgbouncer.service valkey.service
+
+[Container]
+ContainerName=platform-worker
+Pod=platform.pod
+Image=localhost/enterprise-platform:latest
+EnvironmentFile=/etc/platform/app.env
+Exec=python -m saq app.core.worker.settings --workers 4
+ReadOnly=true
+Tmpfs=/tmp:rw,noexec,nosuid,size=128m
+Volume=/var/log/platform:/app/logs:Z
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target multi-user.target

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import structlog
@@ -9,29 +10,52 @@ import structlog
 from app.core.settings import settings
 
 logger = structlog.get_logger("app.cache")
-_valkey_pool: Any = None
+_valkey_pools: dict[asyncio.AbstractEventLoop, Any] = {}
+_fallback_valkey_pool: Any = None
+
+
+def _create_valkey_client() -> Any:
+    """Instantiate a low-level async Valkey or Redis client."""
+    try:
+        import valkey.asyncio as valkey
+
+        return valkey.Valkey(
+            host=settings.VALKEY_HOST,
+            port=settings.VALKEY_PORT,
+            decode_responses=False,
+            socket_connect_timeout=2,
+        )
+    except ImportError:
+        import redis.asyncio as redis
+
+        return redis.Redis(
+            host=settings.VALKEY_HOST,
+            port=settings.VALKEY_PORT,
+            decode_responses=False,
+            socket_connect_timeout=2,
+        )
 
 
 def get_valkey_pool() -> Any:
-    """Return a shared asynchronous Valkey/Redis connection client."""
-    global _valkey_pool
-    if _valkey_pool is None:
-        try:
-            import valkey.asyncio as valkey
+    """Return a shared asynchronous Valkey/Redis connection client tied to current event loop."""
+    global _fallback_valkey_pool
 
-            _valkey_pool = valkey.Valkey(
-                host=settings.VALKEY_HOST,
-                port=settings.VALKEY_PORT,
-                decode_responses=False,
-                socket_connect_timeout=2,
-            )
-        except ImportError:
-            import redis.asyncio as redis
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
 
-            _valkey_pool = redis.Redis(
-                host=settings.VALKEY_HOST,
-                port=settings.VALKEY_PORT,
-                decode_responses=False,
-                socket_connect_timeout=2,
-            )
-    return _valkey_pool
+    if loop is not None:
+        closed = [lp for lp in _valkey_pools if lp.is_closed()]
+        for lp in closed:
+            _valkey_pools.pop(lp, None)
+
+        if loop in _valkey_pools:
+            return _valkey_pools[loop]
+
+    client = _create_valkey_client()
+    if loop is not None:
+        _valkey_pools[loop] = client
+    else:
+        _fallback_valkey_pool = client
+    return client
