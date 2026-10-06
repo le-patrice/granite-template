@@ -21,7 +21,7 @@ NC     := \033[0m # No Color
 # ------------------------------------------------------------------------------
 CONTAINER_ENGINE ?= podman
 KUBE_POD_FILE    ?= config/platform-pod.yaml
-POD_NAME         ?= platform-pod
+POD_NAME         ?= enterprise-platform-pod
 ENV_FILE         ?= --env-file .env
 
 # Execution wrappers — Pure Podman 5 native pod container execution
@@ -185,13 +185,13 @@ down-volumes: ## Stop stack and PERMANENTLY DESTROY all database data volumes
 		sed "s|path: \./|path: $$PWD/|g" $(KUBE_POD_FILE) | $(CONTAINER_ENGINE) kube down --force - 2>/dev/null || true; \
 	fi
 	@$(CONTAINER_ENGINE) pod rm -f $(POD_NAME) 2>/dev/null || true
-	@$(CONTAINER_ENGINE) volume rm -f postgres-data valkey-data postgres_data valkey_data 2>/dev/null || true
+	@$(CONTAINER_ENGINE) volume rm -f enterprise-platform-postgres-data enterprise-platform-valkey-data $(POD_NAME)-postgres-data $(POD_NAME)-valkey-data postgres-data valkey-data postgres_data valkey_data 2>/dev/null || true
 	@echo -e "$(GREEN)✅ Containers and persistent volumes wiped clean$(NC)"
 
 .PHONY: down-check
 down-check: ## Stop project and verify no lingering containers remain on host
 	@echo -e "$(YELLOW)Checking for remaining project containers...$(NC)"
-	@$(CONTAINER_ENGINE) ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E 'platform-pod|app|worker|postgres|valkey|traefik|pgbouncer|telemetry' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
+	@$(CONTAINER_ENGINE) ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E '$(POD_NAME)|app|worker|postgres|valkey|traefik|pgbouncer|telemetry' || echo -e "$(GREEN)✅ No matching project containers running$(NC)"
 
 .PHONY: stop
 stop: ## Stop all services or a specific target (e.g., make stop SERVICE=app)

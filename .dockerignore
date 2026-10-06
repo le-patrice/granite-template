@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+**/node_modules
+**/dist
+**/.pytest_cache
+**/.ruff_cache
+**/__pycache__
+*.py[cod]
+*.log
+logs/
+.DS_Store

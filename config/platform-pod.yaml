@@ -10,7 +10,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: platform-pod
+  name: enterprise-platform-pod
   labels:
     app.kubernetes.io/name: enterprise-platform
     app.kubernetes.io/part-of: granite-template
@@ -21,10 +21,10 @@ spec:
   volumes:
     - name: postgres-storage
       persistentVolumeClaim:
-        claimName: postgres-data
+        claimName: enterprise-platform-postgres-data
     - name: valkey-storage
       persistentVolumeClaim:
-        claimName: valkey-data
+        claimName: enterprise-platform-valkey-data
     - name: traefik-config
       hostPath:
         path: ./config/traefik-dev.yml
@@ -278,7 +278,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-data
+  name: enterprise-platform-postgres-data
 spec:
   accessModes:
     - ReadWriteOnce
@@ -289,7 +289,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: valkey-data
+  name: enterprise-platform-valkey-data
 spec:
   accessModes:
     - ReadWriteOnce

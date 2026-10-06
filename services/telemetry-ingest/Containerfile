@@ -3,12 +3,13 @@ FROM docker.io/library/golang:1.24-alpine AS builder
 
 WORKDIR /build
 
-RUN apk add --no-cache git ca-certificates
-
+# Cache Go modules first before copying entire source code
 COPY go.mod go.sum* ./
+RUN go mod download
+
+# Copy source code and compile statically
 COPY . .
-RUN go mod tidy && go mod download && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s" \
     -o telemetry-ingest .
 

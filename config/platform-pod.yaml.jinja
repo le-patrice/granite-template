@@ -22,11 +22,11 @@ spec:
   volumes:
     - name: postgres-storage
       persistentVolumeClaim:
-        claimName: postgres-data
+        claimName: {{ project_slug }}-postgres-data
 {% if include_valkey %}
     - name: valkey-storage
       persistentVolumeClaim:
-        claimName: valkey-data
+        claimName: {{ project_slug }}-valkey-data
 {% endif %}
     - name: traefik-config
       hostPath:
@@ -319,7 +319,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-data
+  name: {{ project_slug }}-postgres-data
 spec:
   accessModes:
     - ReadWriteOnce
@@ -331,7 +331,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: valkey-data
+  name: {{ project_slug }}-valkey-data
 spec:
   accessModes:
     - ReadWriteOnce
