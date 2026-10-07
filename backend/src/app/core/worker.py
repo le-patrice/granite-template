@@ -127,9 +127,8 @@ async def prune_expired_sessions(ctx: Context, **kwargs: Any) -> int:
     job_id = ctx.get("job_id", "unknown")
     logger.info("task.prune_sessions.started", job_id=job_id)
     v_client = get_valkey_pool()
-    keys = await v_client.keys("idempotency:*")
     pruned_count = 0
-    for key in keys:
+    async for key in v_client.scan_iter(match="idempotency:*", count=100):
         ttl = await v_client.ttl(key)
         if ttl == -1:  # Key without expiration
             await v_client.expire(key, 86400)
@@ -207,10 +206,6 @@ async def poll_and_dispatch_outbox(ctx: Context, **kwargs: Any) -> int:
 cron_jobs = [
     # Run session pruning every hour at minute 0
     CronJob(function=prune_expired_sessions, cron="0 * * * *"),
-    # Run telemetry rollup every 15 minutes
-    CronJob(
-        function=process_telemetry_aggregation, cron="*/15 * * * *", kwargs={"time_window": "15m"}
-    ),
     # Poll and dispatch pending transactional outbox events every minute
     CronJob(function=poll_and_dispatch_outbox, cron="* * * * *"),
 ]

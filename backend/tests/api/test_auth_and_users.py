@@ -104,6 +104,38 @@ class TestRegistration:
         resp = await async_client.post(_REGISTER_URL, json=payload)
         assert resp.status_code in (400, 422)
 
+    async def test_register_ignores_client_supplied_role_and_superuser_flags(
+        self, async_client: AsyncClient
+    ):
+        email = f"attacker.{uuid.uuid4().hex[:8]}@example.com"
+        payload = {
+            "email": email,
+            "password": "Password123!",
+            "full_name": "Privilege Attacker",
+            "role": "superadmin",
+            "is_superuser": True,
+        }
+        resp = await async_client.post(_REGISTER_URL, json=payload)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["email"] == email
+        assert data["role"] == "member"
+        assert data["is_superuser"] is False
+
+    async def test_disabled_open_registration_blocks_public_signup(
+        self, async_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        from app.core.settings import settings
+
+        monkeypatch.setattr(settings, "ALLOW_OPEN_REGISTRATION", False)
+        payload = {
+            "email": f"blocked.{uuid.uuid4().hex[:8]}@example.com",
+            "password": "Password123!",
+            "full_name": "Blocked User",
+        }
+        resp = await async_client.post(_REGISTER_URL, json=payload)
+        assert resp.status_code == 403
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Login

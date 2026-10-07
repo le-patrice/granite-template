@@ -93,6 +93,43 @@ async def init_admin_user() -> None:
         logger.warning("superuser_startup_seed_deferred", error=str(exc))
 
 
+async def verify_runtime_role_security() -> None:
+    """Verify that if connecting as app_runtime, the role is non-superuser and has no bypassrls."""
+    try:
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        engine = create_async_engine(settings.DATABASE_URL)
+        async with engine.connect() as conn:
+            res = await conn.execute(
+                text(
+                    "SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
+                )
+            )
+            row = res.fetchone()
+            if row:
+                rolname, is_super, bypass_rls = row[0], bool(row[1]), bool(row[2])
+                if rolname == "app_runtime" and (is_super or bypass_rls):
+                    logger.error(
+                        "security.runtime_role_misconfigured",
+                        role=rolname,
+                        rolsuper=is_super,
+                        rolbypassrls=bypass_rls,
+                    )
+                    raise RuntimeError(
+                        "Security violation: app_runtime role has SUPERUSER or BYPASSRLS privileges!"
+                    )
+                logger.info(
+                    "security.runtime_role_verified",
+                    role=rolname,
+                    rolsuper=is_super,
+                    rolbypassrls=bypass_rls,
+                )
+        await engine.dispose()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("security.runtime_role_check_deferred", error=str(exc))
+
+
 middleware_list = [
     RequestLoggingMiddleware,
     CSRFOriginMiddleware,
@@ -111,5 +148,5 @@ app = Litestar(
     stores={"valkey": valkey_store},
     openapi_config=openapi_config if settings.ENVIRONMENT != "production" else None,
     debug=settings.DEBUG,
-    on_startup=[init_admin_user],
+    on_startup=[init_admin_user, verify_runtime_role_security],
 )

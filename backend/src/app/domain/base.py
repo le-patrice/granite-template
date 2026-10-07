@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Any, ClassVar, Generic, TypeVar
 
 import msgspec
-from sqlalchemy import CheckConstraint, DateTime, Integer, func
+from sqlalchemy import CheckConstraint, DateTime, Integer, func, text
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import JSON, TypeDecorator, TypeEngine
@@ -85,6 +85,18 @@ class AuditBase(Base):
 # ---------------------------------------------------------------------------
 
 
+def _resolve_current_tenant_id() -> uuid.UUID | None:
+    try:
+        from app.core.database import current_tenant_id
+
+        val = current_tenant_id.get(None)
+        if val:
+            return uuid.UUID(str(val))
+    except Exception:  # noqa: BLE001, S110
+        pass
+    return None
+
+
 class TenantBase(AuditBase):
     """
     Tenant-scoped base entity with PostgreSQL Row-Level Security (RLS) support
@@ -95,6 +107,8 @@ class TenantBase(AuditBase):
 
     organization_id: Mapped[uuid.UUID] = mapped_column(
         index=True,
+        default=_resolve_current_tenant_id,
+        server_default=text("NULLIF(current_setting('app.current_tenant_id', true), '')::uuid"),
         nullable=False,
     )
     version_id: Mapped[int] = mapped_column(

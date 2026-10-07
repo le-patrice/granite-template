@@ -48,6 +48,9 @@ class AppSettings(BaseSettings):
     # ── API Documentation UI ──────────────────────────────────────────────────
     DOCS_UI: str = "swagger"  # swagger | scalar | redoc | elements | rapidoc
 
+    # ── Registration & Multi-Tenant Governance ───────────────────────────────
+    ALLOW_OPEN_REGISTRATION: bool = True
+
     # ── CSRF & Origin Security ────────────────────────────────────────────────
     CSRF_PROTECTION_ENABLED: bool = True
     ALLOWED_ORIGINS: list[str] = [

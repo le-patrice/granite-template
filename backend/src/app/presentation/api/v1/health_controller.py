@@ -95,17 +95,39 @@ class HealthController(Controller):
         path="/startup",
         status_code=HTTP_200_OK,
         summary="Startup Probe",
-        description="Validates that database migrations are executed and operational.",
+        description="Validates that database migrations are executed and runtime role security is enforced.",
     )
     async def get_startup(self, db_session: AsyncSession) -> dict[str, Any]:
         try:
-            # Check alembic_version table
+            # 1. Check alembic_version table
             res = await db_session.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
             version = res.scalar_one_or_none()
+
+            # 2. Check runtime role security (ensure app_runtime cannot bypass RLS)
+            role_res = await db_session.execute(
+                text(
+                    "SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
+                )
+            )
+            role_info = role_res.fetchone()
+            if role_info:
+                rolname, is_super, bypass_rls = role_info[0], bool(role_info[1]), bool(role_info[2])
+                if rolname == "app_runtime" and (is_super or bypass_rls):
+                    raise HTTPException(
+                        status_code=HTTP_503_SERVICE_UNAVAILABLE,
+                        detail={
+                            "status": "startup_failed",
+                            "error": "Security violation: app_runtime role cannot have SUPERUSER or BYPASSRLS privileges",
+                        },
+                    )
+
             return {
                 "status": "started",
                 "schema_version": version or "initial",
+                "runtime_role": role_info[0] if role_info else "unknown",
             }
+        except HTTPException:
+            raise
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=HTTP_503_SERVICE_UNAVAILABLE,

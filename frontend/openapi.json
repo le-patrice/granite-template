@@ -1408,7 +1408,7 @@
     "/health/startup": {
       "get": {
         "deprecated": false,
-        "description": "Validates that database migrations are executed and operational.",
+        "description": "Validates that database migrations are executed and runtime role security is enforced.",
         "operationId": "HealthStartupGetStartup",
         "responses": {
           "200": {

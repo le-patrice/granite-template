@@ -456,7 +456,7 @@ export const healthReadyGetReadiness = <ThrowOnError extends boolean = false>(op
 /**
  * Startup Probe
  *
- * Validates that database migrations are executed and operational.
+ * Validates that database migrations are executed and runtime role security is enforced.
  */
 export const healthStartupGetStartup = <ThrowOnError extends boolean = false>(options?: Options<HealthStartupGetStartupData, ThrowOnError>): RequestResult<HealthStartupGetStartupResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthStartupGetStartupResponses, unknown, ThrowOnError>({
     security: [{

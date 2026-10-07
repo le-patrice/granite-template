@@ -178,7 +178,8 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
     cleanly after each test.
     """
     await _flush_rate_limits()
-    async with AsyncTestClient(app=litestar_app) as client:
+    async with AsyncTestClient(app=litestar_app, base_url="http://localhost:8000") as client:
+        client.headers["origin"] = "http://localhost:8000"
         yield client
     await _flush_rate_limits()
 

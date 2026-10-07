@@ -150,3 +150,47 @@ async def tenant_session(
         current_user_id.reset(token_user)
         current_role.reset(token_role)
         current_is_superuser.reset(token_super)
+
+
+@asynccontextmanager
+async def unit_of_work(
+    session: AsyncSession | None = None,
+    tenant_id: str | uuid.UUID | None = None,
+    user_id: str | uuid.UUID | None = None,
+    role: str = "user",
+    is_superuser: bool = False,
+) -> AsyncIterator[AsyncSession]:
+    """
+    Unit of Work transactional context manager.
+    Commits changes automatically upon clean block exit, rolls back on exception,
+    and seamlessly binds tenant isolation context when tenant_id is provided.
+    """
+    if tenant_id is not None:
+        async with tenant_session(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            role=role,
+            is_superuser=is_superuser,
+            session=session,
+        ) as s:
+            try:
+                yield s
+                await s.commit()
+            except Exception:
+                await s.rollback()
+                raise
+    elif session is not None:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+    else:
+        async with db_config.get_session() as s:
+            try:
+                yield s
+                await s.commit()
+            except Exception:
+                await s.rollback()
+                raise

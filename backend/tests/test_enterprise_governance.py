@@ -21,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.csrf import CSRFOriginMiddleware
-from app.core.database import current_tenant_id, tenant_session
+from app.core.database import current_tenant_id, tenant_session, unit_of_work
 from app.core.worker import poll_and_dispatch_outbox
 from app.domain.base import TenantBase
 from app.domain.events.models import OutboxEvent, OutboxStatus
@@ -430,5 +430,147 @@ class TestNonSuperuserRLSIsolation:
                 )
                 count = res.scalar()
                 assert count == 1, "Superadmin should see all tenant rows"
+        finally:
+            await runtime_engine.dispose()
+
+
+@pytest.mark.asyncio
+class TestUnitOfWorkHelper:
+    async def test_unit_of_work_commits_on_success(self, async_engine):
+        user_id = uuid.uuid4()
+        email = f"uow.{uuid.uuid4().hex[:8]}@example.com"
+
+        async with (
+            AsyncSession(async_engine, expire_on_commit=False) as s,
+            unit_of_work(session=s) as session,
+        ):
+            user = User(
+                id=user_id,
+                email=email,
+                hashed_password="hash",
+                full_name="UoW User",
+                is_active=True,
+                is_superuser=False,
+            )
+            session.add(user)
+
+        # Verify persisted
+        async with AsyncSession(async_engine, expire_on_commit=False) as session:
+            res = await session.execute(
+                text("SELECT email FROM platform_users WHERE id = :id"),
+                {"id": user_id},
+            )
+            assert res.scalar() == email
+
+    async def test_unit_of_work_rolls_back_on_exception(self, async_engine):
+        user_id = uuid.uuid4()
+        email = f"uow.fail.{uuid.uuid4().hex[:8]}@example.com"
+
+        with pytest.raises(RuntimeError):
+            async with (
+                AsyncSession(async_engine, expire_on_commit=False) as s,
+                unit_of_work(session=s) as session,
+            ):
+                user = User(
+                    id=user_id,
+                    email=email,
+                    hashed_password="hash",
+                    full_name="UoW Fail User",
+                    is_active=True,
+                    is_superuser=False,
+                )
+                session.add(user)
+                raise RuntimeError("Deliberate failure to test rollback")
+
+        # Verify NOT persisted
+        async with AsyncSession(async_engine, expire_on_commit=False) as session:
+            res = await session.execute(
+                text("SELECT count(*) FROM platform_users WHERE id = :id"),
+                {"id": user_id},
+            )
+            assert res.scalar() == 0
+
+
+@pytest.mark.asyncio
+class TestStrictTenantRLSProcedure:
+    async def test_attach_tenant_rls_strict_rejects_null_tenant(self, async_engine):
+        db_url = os.environ.get(
+            "DATABASE_URL",
+            "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db",
+        )
+        runtime_url = db_url.replace("app_user:", "app_runtime:")
+        runtime_engine = create_async_engine(runtime_url)
+
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
+
+        try:
+            # 1. Setup table with attach_tenant_rls_strict
+            async with AsyncSession(async_engine) as admin_s:
+                await admin_s.execute(
+                    text(
+                        "CREATE TABLE IF NOT EXISTS test_strict_entities ("
+                        "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
+                        "  name VARCHAR(128) NOT NULL,"
+                        "  organization_id UUID"
+                        ");"
+                    )
+                )
+                await admin_s.execute(
+                    text("SELECT attach_tenant_rls_strict('test_strict_entities');")
+                )
+                await admin_s.execute(
+                    text(
+                        "GRANT SELECT, INSERT, UPDATE, DELETE ON test_strict_entities TO app_runtime;"
+                    )
+                )
+                await admin_s.commit()
+
+            # 2. Insert row as Tenant A under app_runtime
+            row_a_id = uuid.uuid4()
+            async with AsyncSession(runtime_engine, expire_on_commit=False) as session_a:
+                session_a.info["tenant_id"] = str(tenant_a)
+                session_a.info["role"] = "user"
+                await session_a.execute(
+                    text(
+                        "INSERT INTO test_strict_entities (id, name, organization_id) "
+                        "VALUES (:id, 'Tenant A Item', :org_id)"
+                    ),
+                    {"id": row_a_id, "org_id": tenant_a},
+                )
+                await session_a.commit()
+
+            # 3. Query as Tenant B under app_runtime: 0 rows
+            async with AsyncSession(runtime_engine, expire_on_commit=False) as session_b:
+                session_b.info["tenant_id"] = str(tenant_b)
+                session_b.info["role"] = "user"
+                res = await session_b.execute(
+                    text("SELECT count(*) FROM test_strict_entities WHERE id = :id"),
+                    {"id": row_a_id},
+                )
+                assert res.scalar() == 0
+
+            # 4. Non-superadmin cannot see NULL-tenant rows under strict RLS
+            null_row_id = uuid.uuid4()
+            async with AsyncSession(async_engine) as admin_s:
+                await admin_s.execute(
+                    text(
+                        "INSERT INTO test_strict_entities (id, name, organization_id) VALUES (:id, 'Orphan', NULL)"
+                    ),
+                    {"id": null_row_id},
+                )
+                await admin_s.commit()
+
+            # Tenant A queries for the NULL-tenant row: MUST BE INVISIBLE (count == 0)
+            async with AsyncSession(runtime_engine, expire_on_commit=False) as session_a:
+                session_a.info["tenant_id"] = str(tenant_a)
+                session_a.info["role"] = "user"
+                res = await session_a.execute(
+                    text("SELECT count(*) FROM test_strict_entities WHERE id = :id"),
+                    {"id": null_row_id},
+                )
+                assert res.scalar() == 0, (
+                    "Strict RLS breach: non-superadmin could read NULL-tenant row!"
+                )
         finally:
             await runtime_engine.dispose()

@@ -67,11 +67,6 @@ class CSRFOriginMiddleware(AbstractMiddleware):
 
         # Reject cookie-authenticated mutations missing both Origin and Referer
         if not source_url:
-            host = headers.get("host", "").lower()
-            if host in {"testserver", "testserver.local"}:
-                await self.app(scope, receive, send)
-                return
-
             await self._reject(
                 send,
                 "CSRF verification failed: missing Origin and Referer on cookie-authenticated request.",

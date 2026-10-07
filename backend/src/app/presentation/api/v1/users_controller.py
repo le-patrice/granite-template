@@ -23,7 +23,7 @@ from typing import ClassVar
 from litestar import Controller, delete, get, patch, post
 from litestar.connection import Request
 from litestar.di import Provide
-from litestar.exceptions import ClientException, NotFoundException
+from litestar.exceptions import ClientException, NotFoundException, PermissionDeniedException
 from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +32,7 @@ from app.core.security import (
     get_password_hash_async,
     verify_password_async,
 )
+from app.core.settings import settings
 from app.domain.users.contracts import IUserRepository
 from app.domain.users.models import User
 from app.domain.users.schemas import (
@@ -78,6 +79,11 @@ class UsersController(Controller):
         data: UserCreate,
         user_repo: IUserRepository,
     ) -> UserRead:
+        if not settings.ALLOW_OPEN_REGISTRATION:
+            raise PermissionDeniedException(
+                detail="Public registration is disabled. Contact your organization administrator."
+            )
+
         existing = await user_repo.get_by_email(data.email)
         if existing:
             raise ClientException(
