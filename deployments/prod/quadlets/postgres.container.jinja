@@ -1,17 +1,27 @@
 [Unit]
-Description=TimescaleDB PostgreSQL Database - {{ project_name }}
+Description={% if include_timescaledb %}TimescaleDB PostgreSQL Database{% else %}PostgreSQL Database{% endif %} - {{ project_name }}
 After=network-online.target local-fs.target
 Wants=network-online.target
 
 [Container]
 ContainerName={{ project_slug }}-postgres
 Pod=platform.pod
+{% if include_timescaledb %}
 Image=docker.io/timescale/timescaledb-ha:pg16
 Volume=postgres.volume:/home/postgres/pgdata/data:Z
+Environment=PGDATA=/home/postgres/pgdata/data
+{% elif include_pgvector %}
+Image=docker.io/pgvector/pgvector:pg16-alpine
+Volume=postgres.volume:/var/lib/postgresql/data:Z
+Environment=PGDATA=/var/lib/postgresql/data
+{% else %}
+Image=docker.io/library/postgres:16-alpine
+Volume=postgres.volume:/var/lib/postgresql/data:Z
+Environment=PGDATA=/var/lib/postgresql/data
+{% endif %}
 Environment=POSTGRES_USER={{ postgres_user }}
 Environment=POSTGRES_PASSWORD={{ postgres_password }}
 Environment=POSTGRES_DB={{ postgres_db }}
-Environment=PGDATA=/home/postgres/pgdata/data
 AutoUpdate=registry
 
 [Service]

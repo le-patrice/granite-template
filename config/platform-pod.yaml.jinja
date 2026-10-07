@@ -71,6 +71,8 @@ spec:
     - name: postgres-db
       {% if include_timescaledb %}
       image: docker.io/timescale/timescaledb-ha:pg16
+      {% elif include_pgvector %}
+      image: docker.io/pgvector/pgvector:pg16-alpine
       {% else %}
       image: docker.io/library/postgres:16-alpine
       {% endif %}
@@ -197,7 +199,7 @@ spec:
         - name: FIRST_SUPERUSER_EMAIL
           value: {{ first_superuser_email }}
         - name: FIRST_SUPERUSER_PASSWORD
-          value: "{{ first_superuser_password }}"
+          value: "{{ first_superuser_password | trim('\"\'') }}"
       volumeMounts:
         - name: backend-src
           mountPath: /app/src

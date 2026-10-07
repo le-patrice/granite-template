@@ -30,7 +30,9 @@ EXEC_DB         = $(CONTAINER_ENGINE) exec -i $(POD_NAME)-postgres-db
 {% if include_frontend %}
 EXEC_FRONTEND   = $(CONTAINER_ENGINE) exec -i $(POD_NAME)-frontend
 {% endif %}
+{% if include_go_telemetry %}
 EXEC_TELEMETRY  = $(CONTAINER_ENGINE) exec -i $(POD_NAME)-telemetry-ingest
+{% endif %}
 
 # Command argument overrides
 SERVICE ?= app
@@ -255,9 +257,11 @@ logs: ## Stream live logs from all stack containers in real time (pure Podman po
 logs-api: ## Stream live logs specifically from the Litestar backend API
 	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-app
 
+{% if include_go_telemetry %}
 .PHONY: logs-telemetry
 logs-telemetry: ## Stream live logs from Go high-throughput telemetry ingestion bypass service
 	@$(CONTAINER_ENGINE) logs -f $(POD_NAME)-telemetry-ingest
+{% endif %}
 
 {% if include_frontend %}
 .PHONY: logs-frontend
@@ -336,7 +340,7 @@ shell: ## Open an interactive shell inside container (e.g., make shell SERVICE=a
 # Container Image Builds
 # ------------------------------------------------------------------------------
 .PHONY: build
-build: build-backend build-telemetry{% if include_frontend %} build-frontend{% endif %} ## Build backend, telemetry, and frontend container images
+build: build-backend{% if include_go_telemetry %} build-telemetry{% endif %}{% if include_frontend %} build-frontend{% endif %} ## Build backend, telemetry, and frontend container images
 
 .PHONY: build-backend
 build-backend: ## Build backend container image from backend context
@@ -344,11 +348,13 @@ build-backend: ## Build backend container image from backend context
 	@$(CONTAINER_ENGINE) build -t localhost/{{ project_slug }}-app:latest -t localhost/{{ project_slug }}:latest -t api-backend:latest -t localhost/api-backend:latest -f config/Containerfile backend/
 	@echo -e "$(GREEN)✅ Backend build finished$(NC)"
 
+{% if include_go_telemetry %}
 .PHONY: build-telemetry
 build-telemetry: ## Build Go telemetry ingest bypass microservice container image
 	@echo -e "$(BLUE)Building Go telemetry ingest microservice (services/telemetry-ingest/Containerfile)...$(NC)"
 	@$(CONTAINER_ENGINE) build -t {{ project_slug }}-telemetry-ingest:latest -t localhost/{{ project_slug }}-telemetry-ingest:latest -t telemetry-ingest:latest -t localhost/telemetry-ingest:latest -f services/telemetry-ingest/Containerfile services/telemetry-ingest/
 	@echo -e "$(GREEN)✅ Telemetry ingest build finished$(NC)"
+{% endif %}
 
 {% if include_frontend %}
 .PHONY: build-frontend

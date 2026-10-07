@@ -136,8 +136,8 @@ services:
       - APP_BASE_URL=http://localhost:{{ app_port }}
       - SECRET_KEY=${SECRET_KEY:-{{ secret_key }}}
       - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-{{ first_superuser_email }}}
-      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-{{ first_superuser_password }}}
-      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME:-{{ author_name }}}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-{{ first_superuser_password | trim('\"\'') }}}
+      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME:-{{ author_name | trim('\"\'') }}}
       - DOCS_UI={{ docs_ui }}
       - RATE_LIMIT_ENABLED={{ "true" if include_rate_limiting else "false" }}
       {% if include_sentry and sentry_dsn %}
@@ -287,18 +287,20 @@ services:
   postgres-db:
     {% if include_timescaledb %}
     image: docker.io/timescale/timescaledb-ha:pg16
+    {% elif include_pgvector %}
+    image: docker.io/pgvector/pgvector:pg16-alpine
     {% else %}
     image: docker.io/library/postgres:16-alpine
     {% endif %}
     container_name: {{ project_slug }}_postgres
     restart: unless-stopped
     environment:
-      - PGDATA=/var/lib/postgresql/data
+      - PGDATA={% if include_timescaledb %}/home/postgres/pgdata/data{% else %}/var/lib/postgresql/data{% endif %}
       - POSTGRES_USER={{ postgres_user }}
       - POSTGRES_PASSWORD={{ postgres_password }}
       - POSTGRES_DB={{ postgres_db }}
     volumes:
-      - postgres_data:/var/lib/postgresql/data:Z
+      - postgres_data:{% if include_timescaledb %}/home/postgres/pgdata/data{% else %}/var/lib/postgresql/data{% endif %}:Z
     ports:
       - "${POSTGRES_PORT:-{{ postgres_port }}}:5432"    # direct access for migrations & psql
     healthcheck:

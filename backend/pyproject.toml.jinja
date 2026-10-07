@@ -1,11 +1,11 @@
 [project]
 name = "{{ project_slug }}"
 version = "0.1.0"
-description = "{{ project_description }}"
+description = "{{ project_description | trim('\"\'') }}"
 readme = "README.md"
 requires-python = ">={{ python_version }}"
 authors = [
-    { name = "{{ author_name }}", email = "{{ author_email }}" },
+    { name = "{{ author_name | trim('\"\'') }}", email = "{{ author_email | trim('\"\'') }}" },
 ]
 dependencies = [
     "litestar[standard]>=2.10.0",

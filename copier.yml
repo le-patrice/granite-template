@@ -26,7 +26,9 @@ _exclude:
   - "{% if not enable_quadlets %}deployments/prod/quadlets/**{% endif %}"
   - "{% if not include_frontend %}frontend/**{% endif %}"
   - "{% if not include_frontend %}deployments/prod/quadlets/frontend.container*{% endif %}"
+  - "{% if not include_go_telemetry %}services/telemetry-ingest{% endif %}"
   - "{% if not include_go_telemetry %}services/telemetry-ingest/**{% endif %}"
+  - "{% if not include_go_telemetry %}deployments/prod/quadlets/telemetry-ingest.container*{% endif %}"
 
 # ------------------------------------------------------------------------------
 # Project Identity & Metadata

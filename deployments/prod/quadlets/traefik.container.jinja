@@ -1,6 +1,6 @@
 [Unit]
 Description=Traefik v3 Edge Proxy & Ingress Mesh - {{ project_name }}
-After=app.service telemetry-ingest.service{% if include_frontend %} frontend.service{% endif %}
+After=app.service{% if include_go_telemetry %} telemetry-ingest.service{% endif %}{% if include_frontend %} frontend.service{% endif %}
 
 [Container]
 ContainerName={{ project_slug }}-traefik
