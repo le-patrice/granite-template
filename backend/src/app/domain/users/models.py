@@ -10,10 +10,14 @@ Migration 0001 already provisions it via
     op.execute('CREATE EXTENSION IF NOT EXISTS "pg_trgm";')
 """
 
-from sqlalchemy import Boolean, Index, String, text
+import uuid
+
+from sqlalchemy import Boolean, ForeignKey, Index, String, text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domain.base import AuditBase
+from app.domain.organizations.models import Organization  # noqa: F401
 
 
 class User(AuditBase):
@@ -29,6 +33,19 @@ class User(AuditBase):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(
+        String(64),
+        default="member",
+        server_default=text("'member'"),
+        nullable=False,
+        index=True,
+    )
 
     __table_args__ = (
         # GIN + gin_trgm_ops — supports ILIKE / LIKE / similarity on email

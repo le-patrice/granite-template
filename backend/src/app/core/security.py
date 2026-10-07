@@ -138,19 +138,30 @@ def create_access_token(
     subject: str,
     expires_delta: timedelta | None = None,
     is_superuser: bool = False,
+    tenant_id: str | uuid.UUID | None = None,
+    role: str | None = None,
     extra: dict | None = None,
 ) -> str:
     """
     Issue a bearer access token for *subject* (user UUID string).
 
     The token carries:
-    •  ``sub``          – user UUID
-    •  ``is_superuser`` – superadmin flag
-    •  ``exp``          – expiry timestamp
-    •  ``iat``          – issued-at timestamp
-    •  ``jti``          – UUID4 for revocation tracking
+    •  ``sub``             – user UUID
+    •  ``is_superuser``    – superadmin flag
+    •  ``tenant_id``       – tenant / organization UUID
+    •  ``organization_id`` – organization UUID alias
+    •  ``role``            – business / system role
+    •  ``exp``             – expiry timestamp
+    •  ``iat``             – issued-at timestamp
+    •  ``jti``             – UUID4 for revocation tracking
     """
-    combined_extra = {"is_superuser": bool(is_superuser)}
+    default_role = "superadmin" if is_superuser else "member"
+    combined_extra = {
+        "is_superuser": bool(is_superuser),
+        "tenant_id": str(tenant_id) if tenant_id else "",
+        "organization_id": str(tenant_id) if tenant_id else "",
+        "role": role or default_role,
+    }
     if extra:
         combined_extra.update(extra)
     payload = _build_payload(subject, expires_delta, extra=combined_extra)

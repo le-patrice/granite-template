@@ -23,6 +23,8 @@ class UserRead(msgspec.Struct, frozen=True):
     full_name: str
     is_active: bool
     is_superuser: bool
+    organization_id: uuid.UUID | None = None
+    role: str = "member"
 
 
 class UsersPublic(msgspec.Struct, frozen=True):

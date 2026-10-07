@@ -69,7 +69,9 @@ async def ensure_db_schema(async_engine):
     """Ensure all SQLAlchemy declarative tables exist in database before running tests."""
     from sqlalchemy import text
 
+    import app.domain.audit.models
     import app.domain.events.models
+    import app.domain.organizations.models
     import app.domain.telemetry.models
     import app.domain.users.models  # noqa: F401
     from app.domain.base import Base

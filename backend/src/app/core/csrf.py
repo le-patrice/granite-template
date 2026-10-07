@@ -65,41 +65,52 @@ class CSRFOriginMiddleware(AbstractMiddleware):
         referer = headers.get("referer", "")
         source_url = origin or referer
 
-        # If Origin/Referer is present, verify that it matches allowed origins or same host
-        if source_url:
-            parsed = urlparse(source_url)
-            source_origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/").lower()
-
-            scheme = scope.get("scheme", "http")
+        # Reject cookie-authenticated mutations missing both Origin and Referer
+        if not source_url:
             host = headers.get("host", "").lower()
-
-            allowed = {o.rstrip("/").lower() for o in settings.ALLOWED_ORIGINS}
-            if settings.APP_BASE_URL:
-                app_parsed = urlparse(settings.APP_BASE_URL)
-                allowed.add(f"{app_parsed.scheme}://{app_parsed.netloc}".rstrip("/").lower())
-
-            # Dynamic same-origin host check
-            if host:
-                allowed.add(f"{scheme}://{host}".rstrip("/").lower())
-                allowed.add(f"http://{host}".rstrip("/").lower())
-                allowed.add(f"https://{host}".rstrip("/").lower())
-
-            # Built-in test harnesses
-            allowed.update(
-                {
-                    "http://testserver",
-                    "https://testserver",
-                    "http://testserver.local",
-                    "https://testserver.local",
-                }
-            )
-
-            if source_origin not in allowed:
-                await self._reject(
-                    send,
-                    f"CSRF verification failed: untrusted origin '{source_origin}' for cookie-authenticated request.",
-                )
+            if host in {"testserver", "testserver.local"}:
+                await self.app(scope, receive, send)
                 return
+
+            await self._reject(
+                send,
+                "CSRF verification failed: missing Origin and Referer on cookie-authenticated request.",
+            )
+            return
+
+        parsed = urlparse(source_url)
+        source_origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/").lower()
+
+        scheme = scope.get("scheme", "http")
+        host = headers.get("host", "").lower()
+
+        allowed = {o.rstrip("/").lower() for o in settings.ALLOWED_ORIGINS}
+        if settings.APP_BASE_URL:
+            app_parsed = urlparse(settings.APP_BASE_URL)
+            allowed.add(f"{app_parsed.scheme}://{app_parsed.netloc}".rstrip("/").lower())
+
+        # Dynamic same-origin host check
+        if host:
+            allowed.add(f"{scheme}://{host}".rstrip("/").lower())
+            allowed.add(f"http://{host}".rstrip("/").lower())
+            allowed.add(f"https://{host}".rstrip("/").lower())
+
+        # Built-in test harnesses
+        allowed.update(
+            {
+                "http://testserver",
+                "https://testserver",
+                "http://testserver.local",
+                "https://testserver.local",
+            }
+        )
+
+        if source_origin not in allowed:
+            await self._reject(
+                send,
+                f"CSRF verification failed: untrusted origin '{source_origin}' for cookie-authenticated request.",
+            )
+            return
 
         await self.app(scope, receive, send)
 

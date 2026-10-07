@@ -59,6 +59,8 @@ def _model_to_read(user: User) -> UserRead:
         full_name=user.full_name,
         is_active=user.is_active,
         is_superuser=user.is_superuser,
+        organization_id=user.organization_id,
+        role=user.role,
     )
 
 
@@ -83,12 +85,15 @@ class UsersController(Controller):
                 status_code=409,
             )
 
+        default_org_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
         new_user = User(
             email=data.email,
             hashed_password=await get_password_hash_async(data.password),
             full_name=data.full_name,
             is_active=True,
             is_superuser=False,
+            organization_id=default_org_id,
+            role="member",
         )
         created = await user_repo.create(new_user)
         return _model_to_read(created)

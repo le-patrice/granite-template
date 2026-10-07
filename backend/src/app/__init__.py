@@ -73,12 +73,17 @@ async def init_admin_user() -> None:
             repo = PostgresUserRepository(session=session)
             existing = await repo.get_by_email(email)
             if not existing:
+                import uuid
+
+                default_org_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
                 superuser = User(
                     email=email,
                     hashed_password=get_password_hash(password),
                     full_name=settings.FIRST_SUPERUSER_NAME,
                     is_superuser=True,
                     is_active=True,
+                    organization_id=default_org_id,
+                    role="superadmin",
                 )
                 await repo.add(superuser)
                 await session.commit()

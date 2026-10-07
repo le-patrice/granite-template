@@ -10,12 +10,13 @@ Tests:
 
 from __future__ import annotations
 
+import os
 import uuid
 
 import pytest
 from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
 from sqlalchemy import String, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -335,3 +336,99 @@ class TestCSRFOriginSecurity:
 
         await middleware(scope, None, lambda event: None)
         assert called
+
+    async def test_csrf_blocks_cookie_post_missing_both_origin_and_referer(self):
+        called = False
+
+        async def dummy_app(scope, receive, send):
+            nonlocal called
+            called = True
+
+        middleware = CSRFOriginMiddleware(dummy_app)
+
+        received_events = []
+
+        async def send(event):
+            received_events.append(event)
+
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/resource",
+            "headers": [
+                (b"cookie", b"access_token=secret_jwt"),
+                (b"host", b"api.example.com"),
+            ],
+        }
+
+        await middleware(scope, None, send)
+        assert not called
+        assert len(received_events) > 0
+        assert received_events[0]["status"] == 403
+
+
+@pytest.mark.asyncio
+class TestNonSuperuserRLSIsolation:
+    async def test_non_superuser_runtime_role_enforces_rls_isolation(self, async_engine):
+        """
+        Validates that connecting as the non-superuser 'app_runtime' role (NOSUPERUSER, NOBYPASSRLS)
+        strictly enforces Row-Level Security: Tenant B cannot read rows created by Tenant A.
+        """
+        db_url = os.environ.get(
+            "DATABASE_URL",
+            "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db",
+        )
+        runtime_url = db_url.replace("app_user:", "app_runtime:")
+        runtime_engine = create_async_engine(runtime_url)
+
+        tenant_a = uuid.uuid4()
+        tenant_b = uuid.uuid4()
+        record_id = uuid.uuid4()
+
+        try:
+            # 1. Insert row under Tenant A context using app_runtime
+            async with AsyncSession(runtime_engine, expire_on_commit=False) as session_a:
+                session_a.info["tenant_id"] = str(tenant_a)
+                session_a.info["role"] = "user"
+                await session_a.execute(
+                    text(
+                        "INSERT INTO audit_logs (id, table_name, operation, record_id, organization_id, created_at) "
+                        "VALUES (:id, 'orders', 'INSERT', :rec_id, :org_id, now())"
+                    ),
+                    {"id": uuid.uuid4(), "rec_id": record_id, "org_id": tenant_a},
+                )
+                await session_a.commit()
+
+            # 2. Query as Tenant B under app_runtime: MUST RETURN 0 ROWS
+            async with AsyncSession(runtime_engine, expire_on_commit=False) as session_b:
+                session_b.info["tenant_id"] = str(tenant_b)
+                session_b.info["role"] = "user"
+                res = await session_b.execute(
+                    text("SELECT count(*) FROM audit_logs WHERE record_id = :rec_id"),
+                    {"rec_id": record_id},
+                )
+                count = res.scalar()
+                assert count == 0, "RLS Breach: Tenant B was able to read Tenant A audit log row!"
+
+            # 3. Query as Tenant A under app_runtime: MUST RETURN 1 ROW
+            async with AsyncSession(runtime_engine, expire_on_commit=False) as session_a:
+                session_a.info["tenant_id"] = str(tenant_a)
+                session_a.info["role"] = "user"
+                res = await session_a.execute(
+                    text("SELECT count(*) FROM audit_logs WHERE record_id = :rec_id"),
+                    {"rec_id": record_id},
+                )
+                count = res.scalar()
+                assert count == 1, "Tenant A should see its own row under RLS"
+
+            # 4. Query as Superadmin: BYPASS ALLOWS SEEING ROW
+            async with AsyncSession(runtime_engine, expire_on_commit=False) as session_admin:
+                session_admin.info["role"] = "superadmin"
+                res = await session_admin.execute(
+                    text("SELECT count(*) FROM audit_logs WHERE record_id = :rec_id"),
+                    {"rec_id": record_id},
+                )
+                count = res.scalar()
+                assert count == 1, "Superadmin should see all tenant rows"
+        finally:
+            await runtime_engine.dispose()

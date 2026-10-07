@@ -27,8 +27,11 @@ if SRC not in sys.path:
 # Add new model imports here as the project grows.
 # ---------------------------------------------------------------------------
 from app.domain.base import Base  # noqa: E402
-import app.domain.users.models  # noqa: E402, F401  – registers User on Base.metadata
+import app.domain.audit.models  # noqa: E402, F401
+import app.domain.events.models  # noqa: E402, F401
+import app.domain.organizations.models  # noqa: E402, F401
 import app.domain.telemetry.models  # noqa: E402, F401  – registers TelemetryReading
+import app.domain.users.models  # noqa: E402, F401  – registers User on Base.metadata
 
 # ---------------------------------------------------------------------------
 # Standard Alembic boilerplate

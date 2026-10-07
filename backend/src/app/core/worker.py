@@ -186,11 +186,13 @@ async def process_batch_export(ctx: Context, **kwargs: Any) -> dict[str, Any]:
 async def poll_and_dispatch_outbox(ctx: Context, **kwargs: Any) -> int:
     """
     Polls unpublished outbox events from PostgreSQL and relays them to Valkey streams.
+    Executes under system superadmin context to read and dispatch events across all tenants.
     """
     from app.adapters.outbox.relay import OutboxRelay, PostgresOutboxRepository
-    from app.core.database import db_config
+    from app.core.database import tenant_session
 
-    async with db_config.get_session() as session:
+    system_tenant = "00000000-0000-0000-0000-000000000000"
+    async with tenant_session(system_tenant, role="superadmin", is_superuser=True) as session:
         repo = PostgresOutboxRepository(session=session)
         relay = OutboxRelay(repo=repo)
         processed = await relay.process_sweep(batch_size=50)

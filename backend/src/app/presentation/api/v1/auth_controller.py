@@ -70,7 +70,12 @@ class AuthController(Controller):
         if not user.is_active:
             raise NotAuthorizedException("User account is inactive.")
 
-        token = create_access_token(subject=str(user.id), is_superuser=user.is_superuser)
+        token = create_access_token(
+            subject=str(user.id),
+            is_superuser=user.is_superuser,
+            tenant_id=user.organization_id,
+            role=user.role,
+        )
         token_response = TokenResponse(
             access_token=token,
             token_type="bearer",

@@ -203,6 +203,21 @@
           },
           "is_superuser": {
             "type": "boolean"
+          },
+          "organization_id": {
+            "oneOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "default": "member",
+            "type": "string"
           }
         },
         "required": [
