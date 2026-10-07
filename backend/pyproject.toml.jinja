@@ -25,6 +25,9 @@ dependencies = [
     "redis>=5.0.0",
     "prometheus-client>=0.20.0",
     "sentry-sdk[litestar,sqlalchemy]>=2.0.0",
+    {% if include_pgvector %}
+    "pgvector>=0.2.5",
+    {% endif %}
     "uvloop>=0.19.0; sys_platform != 'win32'",
 ]
 

@@ -72,7 +72,7 @@ spec:
       {% if include_timescaledb %}
       image: docker.io/timescale/timescaledb-ha:pg16
       {% elif include_pgvector %}
-      image: docker.io/pgvector/pgvector:pg16-alpine
+      image: docker.io/pgvector/pgvector:pg16
       {% else %}
       image: docker.io/library/postgres:16-alpine
       {% endif %}
