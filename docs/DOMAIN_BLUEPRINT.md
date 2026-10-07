@@ -18,6 +18,7 @@
 10. [Selectable OpenAPI 3.1 Documentation System](#10-selectable-openapi-31-documentation-system)
 11. [Production Edge Profile & Cloudflare Tunnel Architecture](#11-production-edge-profile--cloudflare-tunnel-architecture)
 12. [Containerized Operational CLI Targets Matrix](#12-containerized-operational-cli-targets-matrix)
+13. [Dual-Engine Architecture & Pure Podman Infrastructure Deep Dive](#13-dual-engine-architecture--pure-podman-infrastructure-deep-dive)
 
 ---
 
@@ -105,6 +106,7 @@ class OrderCreate(msgspec.Struct, frozen=True):
     """Payload for creating a new order."""
 
     customer_id: uuid.UUID
+    customer_email: str
     line_items: list[LineItemCreate]
     notes: str | None = None
 
@@ -164,23 +166,23 @@ class OrderFilterParams(msgspec.Struct, frozen=True):
 Order domain contracts.
 
 All concrete adapters (Postgres, in-memory for tests) must satisfy this Protocol.
-Domain services depend only on this interface — never on SQLAlchemy directly.
+Domain services and controllers depend only on this interface — never on SQLAlchemy ORM entities directly.
 """
 from __future__ import annotations
 
 import uuid
 from typing import Protocol, runtime_checkable
 
-from app.domain.orders.models import Order
-from app.domain.orders.schemas import OrderCreate, OrderFilterParams, OrderUpdate
+from app.domain.base import PaginationEnvelope
+from app.domain.orders.schemas import OrderCreate, OrderFilterParams, OrderRead, OrderUpdate
 
 
 @runtime_checkable
 class IOrderRepository(Protocol):
-    async def create(self, payload: OrderCreate) -> Order: ...
-    async def get_by_id(self, order_id: uuid.UUID) -> Order | None: ...
-    async def list(self, filters: OrderFilterParams) -> list[Order]: ...
-    async def update(self, order_id: uuid.UUID, payload: OrderUpdate) -> Order | None: ...
+    async def create(self, payload: OrderCreate) -> OrderRead: ...
+    async def get_by_id(self, order_id: uuid.UUID) -> OrderRead | None: ...
+    async def list(self, filters: OrderFilterParams) -> PaginationEnvelope[OrderRead]: ...
+    async def update(self, order_id: uuid.UUID, payload: OrderUpdate) -> OrderRead | None: ...
     async def delete(self, order_id: uuid.UUID) -> bool: ...
 ```
 
@@ -194,25 +196,23 @@ class IOrderRepository(Protocol):
 """
 Order ORM model.
 
-• Inherits AuditBase (UUID PK, created_at, updated_at with server defaults).
+• Inherits TenantBase (organization_id, version_id for OCC, UUID PK, UTC audit timestamps).
+• Enforces database-level CHECK constraints for status enum values.
 • Eager-loads line_items via selectin loading to avoid N+1.
 """
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.base import AuditBase
-
-if TYPE_CHECKING:
-    from app.domain.orders.models import LineItem
+from app.domain.base import TenantBase, enum_check_constraint
+from app.domain.orders.schemas import OrderStatus
 
 
-class Order(AuditBase):
+class Order(TenantBase):
     __tablename__ = "orders"
 
     customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
@@ -229,10 +229,12 @@ class Order(AuditBase):
 
     __table_args__ = (
         Index("ix_orders_customer_status", "customer_id", "status"),
+        Index("ix_orders_tenant_lookup", "organization_id", "created_at"),
+        enum_check_constraint("status", OrderStatus),
     )
 
 
-class LineItem(AuditBase):
+class LineItem(TenantBase):
     __tablename__ = "order_line_items"
 
     order_id: Mapped[uuid.UUID] = mapped_column(
@@ -248,12 +250,34 @@ class LineItem(AuditBase):
     order: Mapped[Order] = relationship("Order", back_populates="line_items")
 ```
 
-#### Optional: pgvector Embeddings
+#### Row-Level Security (RLS) PostgreSQL DDL Migration Pattern
+
+For multi-tenant domains inheriting `TenantBase`, add the following to your Alembic migration `upgrade()`:
+
+```python
+# alembic/versions/xxxx_add_orders_tables.py
+def upgrade() -> None:
+    # 1. Create tables ...
+    # 2. Enable PostgreSQL Row-Level Security (RLS)
+    op.execute("ALTER TABLE orders ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE orders FORCE ROW LEVEL SECURITY;")
+    op.execute("""
+        CREATE POLICY orders_tenant_isolation ON orders
+            AS RESTRICTIVE
+            USING (
+                current_setting('app.current_role', true) = 'superadmin'
+                OR organization_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid
+            );
+    """)
+```
+
+#### Optional: pgvector Embeddings (HNSW Indexing)
 
 For semantic search domains (NLP pipelines, product catalog):
 
 ```python
 from pgvector.sqlalchemy import Vector
+from app.domain.base import AuditBase
 
 class ProductEmbedding(AuditBase):
     __tablename__ = "product_embeddings"
@@ -263,12 +287,12 @@ class ProductEmbedding(AuditBase):
     embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=False)
 
     __table_args__ = (
-        # IVFFlat index — tune lists= based on row count (rows / 1000, min 10)
+        # HNSW cosine distance index — provides sub-5ms semantic retrieval without IVFFlat warmups
         Index(
-            "ix_product_embeddings_ivfflat",
+            "ix_product_embeddings_hnsw",
             "embedding",
-            postgresql_using="ivfflat",
-            postgresql_with={"lists": 100},
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
@@ -325,12 +349,13 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.base import PaginationEnvelope
 from app.domain.orders.models import LineItem, Order
 from app.domain.orders.schemas import (
-    LineItemRead, OrderCreate, OrderFilterParams, OrderRead, OrderUpdate,
+    LineItemRead, OrderCreate, OrderFilterParams, OrderRead, OrderStatus, OrderUpdate,
 )
 
 
@@ -338,7 +363,7 @@ class PostgresOrderRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create(self, payload: OrderCreate) -> Order:
+    async def create(self, payload: OrderCreate) -> OrderRead:
         total = sum(li.quantity * li.unit_price_cents for li in payload.line_items)
         order = Order(
             customer_id=payload.customer_id,
@@ -354,41 +379,58 @@ class PostgresOrderRepository:
             ],
         )
         self._session.add(order)
-        await self._session.commit()
+        # Flush to persist entities and populate DB-generated attributes without committing the outer transaction
+        await self._session.flush()
         await self._session.refresh(order)
-        return order
+        return to_order_read(order)
 
-    async def get_by_id(self, order_id: uuid.UUID) -> Order | None:
+    async def get_by_id(self, order_id: uuid.UUID) -> OrderRead | None:
         result = await self._session.execute(select(Order).where(Order.id == order_id))
-        return result.scalar_one_or_none()
+        order = result.scalar_one_or_none()
+        return to_order_read(order) if order else None
 
-    async def list(self, filters: OrderFilterParams) -> list[Order]:
+    async def list(self, filters: OrderFilterParams) -> PaginationEnvelope[OrderRead]:
         query = select(Order)
+        count_query = select(func.count()).select_from(Order)
         if filters.customer_id is not None:
             query = query.where(Order.customer_id == filters.customer_id)
+            count_query = count_query.where(Order.customer_id == filters.customer_id)
         if filters.status is not None:
-            query = query.where(Order.status == filters.status)
-        result = await self._session.execute(query.limit(filters.limit).offset(filters.offset))
-        return list(result.scalars().all())
+            query = query.where(Order.status == filters.status.value)
+            count_query = count_query.where(Order.status == filters.status.value)
 
-    async def update(self, order_id: uuid.UUID, payload: OrderUpdate) -> Order | None:
-        order = await self.get_by_id(order_id)
+        total = (await self._session.execute(count_query)).scalar_one()
+        result = await self._session.execute(
+            query.limit(filters.limit).offset(filters.offset).order_by(Order.created_at.desc())
+        )
+        orders = result.scalars().all()
+        return PaginationEnvelope(
+            items=[to_order_read(o) for o in orders],
+            total=int(total),
+            limit=filters.limit,
+            offset=filters.offset,
+        )
+
+    async def update(self, order_id: uuid.UUID, payload: OrderUpdate) -> OrderRead | None:
+        result = await self._session.execute(select(Order).where(Order.id == order_id))
+        order = result.scalar_one_or_none()
         if order is None:
             return None
         if payload.status is not None:
-            order.status = payload.status
+            order.status = payload.status.value
         if payload.notes is not None:
             order.notes = payload.notes
-        await self._session.commit()
+        await self._session.flush()
         await self._session.refresh(order)
-        return order
+        return to_order_read(order)
 
     async def delete(self, order_id: uuid.UUID) -> bool:
-        order = await self.get_by_id(order_id)
+        result = await self._session.execute(select(Order).where(Order.id == order_id))
+        order = result.scalar_one_or_none()
         if order is None:
             return False
         await self._session.delete(order)
-        await self._session.commit()
+        await self._session.flush()
         return True
 
 
@@ -397,7 +439,7 @@ def to_order_read(order: Order) -> OrderRead:
     return OrderRead(
         id=order.id,
         customer_id=order.customer_id,
-        status=order.status,  # type: ignore[arg-type]
+        status=OrderStatus(order.status),
         notes=order.notes,
         total_cents=order.total_cents,
         line_items=[
@@ -426,9 +468,10 @@ def to_order_read(order: Order) -> OrderRead:
 """
 Orders API Controller.
 
-• Class-level `dependencies` inject the concrete repository via Litestar DI.
+• Class-level `dependencies` inject the abstract repository protocol via Litestar DI.
+• Handlers type against `IOrderRepository`, strictly preserving Clean Architecture.
 • `guards` enforce JWT authentication on all routes in this controller.
-• Returns typed msgspec.Struct — Litestar serializes with zero overhead.
+• Returns typed msgspec.Struct / PaginationEnvelope — Litestar serializes with zero overhead.
 """
 from __future__ import annotations
 
@@ -442,13 +485,17 @@ from litestar.handlers import delete, get, patch, post
 from litestar.status_codes import HTTP_204_NO_CONTENT
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.postgres.orders_repository import PostgresOrderRepository, to_order_read
-from app.domain.orders.schemas import OrderCreate, OrderFilterParams, OrderRead, OrderUpdate
+from app.domain.base import PaginationEnvelope
+from app.domain.orders.interfaces import IOrderRepository
+from app.domain.orders.schemas import (
+    OrderCreate, OrderFilterParams, OrderRead, OrderStatus, OrderUpdate,
+)
 from app.presentation.guards.auth_guard import require_authenticated
 
 
-async def provide_orders_repo(db_session: AsyncSession) -> PostgresOrderRepository:
-    return PostgresOrderRepository(db_session)
+async def provide_orders_repo(db_session: AsyncSession) -> IOrderRepository:
+    from app.adapters.postgres.orders_repository import PostgresOrderRepository
+    return PostgresOrderRepository(session=db_session)
 
 
 class OrdersController(Controller):
@@ -461,49 +508,48 @@ class OrdersController(Controller):
 
     @post("/", status_code=201, summary="Create a new order")
     async def create_order(
-        self, data: OrderCreate, orders_repo: PostgresOrderRepository
+        self, data: OrderCreate, orders_repo: IOrderRepository
     ) -> OrderRead:
-        order = await orders_repo.create(data)
-        return to_order_read(order)
+        return await orders_repo.create(data)
 
-    @get("/", summary="List orders with optional filters")
+    @get("/", summary="List orders with pagination envelope")
     async def list_orders(
         self,
-        orders_repo: PostgresOrderRepository,
+        orders_repo: IOrderRepository,
         customer_id: uuid.UUID | None = None,
-        status: str | None = None,
+        status: OrderStatus | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[OrderRead]:
+    ) -> PaginationEnvelope[OrderRead]:
         filters = OrderFilterParams(
             customer_id=customer_id,
-            status=status,  # type: ignore[arg-type]
+            status=status,
             limit=limit,
             offset=offset,
         )
-        return [to_order_read(o) for o in await orders_repo.list(filters)]
+        return await orders_repo.list(filters)
 
     @get("/{order_id:uuid}", summary="Get an order by ID")
     async def get_order(
-        self, order_id: uuid.UUID, orders_repo: PostgresOrderRepository
+        self, order_id: uuid.UUID, orders_repo: IOrderRepository
     ) -> OrderRead:
         order = await orders_repo.get_by_id(order_id)
         if order is None:
             raise NotFoundException(f"Order {order_id} not found")
-        return to_order_read(order)
+        return order
 
     @patch("/{order_id:uuid}", summary="Update an order")
     async def update_order(
-        self, order_id: uuid.UUID, data: OrderUpdate, orders_repo: PostgresOrderRepository
+        self, order_id: uuid.UUID, data: OrderUpdate, orders_repo: IOrderRepository
     ) -> OrderRead:
         order = await orders_repo.update(order_id, data)
         if order is None:
             raise NotFoundException(f"Order {order_id} not found")
-        return to_order_read(order)
+        return order
 
     @delete("/{order_id:uuid}", status_code=HTTP_204_NO_CONTENT, summary="Delete an order")
     async def delete_order(
-        self, order_id: uuid.UUID, orders_repo: PostgresOrderRepository
+        self, order_id: uuid.UUID, orders_repo: IOrderRepository
     ) -> None:
         if not await orders_repo.delete(order_id):
             raise NotFoundException(f"Order {order_id} not found")
@@ -585,19 +631,36 @@ async def trigger_report(order_id: uuid.UUID) -> dict:
 ### Pattern C — Transactional Outbox & Real-time LISTEN/NOTIFY Relay
 
 ```python
-# 1. Atomic insertion inside mutating business transaction
-async def create_with_event(self, payload: OrderCreate) -> Order:
-    async with self._session.begin():
-        order = Order(...)
-        self._session.add(order)
+# 1. Atomic insertion inside mutating business transaction (Unit of Work)
+async def create_with_event(self, payload: OrderCreate) -> OrderRead:
+    order = Order(
+        customer_id=payload.customer_id,
+        notes=payload.notes,
+        total_cents=sum(li.quantity * li.unit_price_cents for li in payload.line_items),
+        line_items=[
+            LineItem(
+                product_sku=li.product_sku,
+                quantity=li.quantity,
+                unit_price_cents=li.unit_price_cents,
+            )
+            for li in payload.line_items
+        ],
+    )
+    self._session.add(order)
+    # Flush entity first so order.id is populated by DB before creating outbox event
+    await self._session.flush()
 
-        # Atomic — both committed or both rolled back; trigger NOTIFY outbox_events_channel
-        event = OutboxEvent(
-            event_type="order.created",
-            payload_json=msgspec.json.encode({"order_id": str(order.id)}).decode(),
-        )
-        self._session.add(event)
-    return order
+    # Atomic — event saved within the exact same database transaction
+    event = OutboxEvent(
+        event_type="order.created",
+        aggregate_type="orders",
+        aggregate_id=str(order.id),
+        payload_json=msgspec.json.encode({"order_id": str(order.id)}).decode(),
+    )
+    self._session.add(event)
+    await self._session.flush()
+    # Single commit at caller or request UoW boundary fires NOTIFY outbox_events_channel
+    return to_order_read(order)
 
 # 2. Real-time push via dedicated listener (bypassing PgBouncer port 6432)
 # Run via: make outbox-listen
@@ -609,7 +672,11 @@ await outbox_relay.listen_and_relay(direct_db_url, valkey_url)
 ```python
 from litestar import get
 from litestar.response import Stream
-from app.core.streaming import stream_memoryview_chunks, stream_dataset_batches
+from app.core.streaming import (
+    stream_file_chunks,
+    stream_memoryview_chunks,
+    stream_dataset_batches,
+)
 
 @get("/analytics/export")
 async def export_large_dataset() -> Stream:
@@ -700,13 +767,14 @@ cd frontend && npm ci && npm run generate-client && npm run dev
 // frontend/src/lib/api.ts
 import { client } from "@/client";
 
+// Configured with credentials: "include" to transmit httpOnly session cookies,
+// with token fallback for non-browser / external API client compatibility.
 client.setConfig({
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? "/api/v1",
-  headers: {
-    get Authorization() {
-      const token = localStorage.getItem("access_token");
-      return token ? `Bearer ${token}` : undefined;
-    },
+  credentials: "include",
+  auth: () => {
+    const token = localStorage.getItem("access_token");
+    return token ? token : "";
   },
 });
 ```
@@ -1105,16 +1173,19 @@ After=traefik.service
 Requires=traefik.service
 
 [Container]
-Image=docker.io/cloudflare/cloudflared:latest
+Image=docker.io/cloudflare/cloudflared:2024.12.0
 ContainerName=platform-cloudflared
 Pod=platform.pod
 Exec=tunnel --no-autoupdate run
-Environment=TUNNEL_TOKEN=${CLOUDFLARED_TUNNEL_TOKEN}
+EnvironmentFile=/etc/platform/app.env
 AutoUpdate=registry
-Network=host
+
+[Service]
+Restart=always
+TimeoutStartSec=60
 
 [Install]
-WantedBy=default.target
+WantedBy=default.target multi-user.target
 ```
 
 ---

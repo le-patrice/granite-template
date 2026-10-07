@@ -123,6 +123,7 @@ const sanitizedBase = rawUrl ? rawUrl.replace(/\/api\/v1\/?$/, "").replace(/\/$/
 
 client.setConfig({
   baseUrl: sanitizedBase,
+  credentials: "include",
   auth: () => {
     const token = localStorage.getItem("access_token");
     return token ? token : "";

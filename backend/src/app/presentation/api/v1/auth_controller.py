@@ -11,8 +11,10 @@ from typing import ClassVar
 
 from litestar import Controller, post
 from litestar.connection import Request
+from litestar.datastructures import Cookie
 from litestar.di import Provide
 from litestar.exceptions import NotAuthorizedException
+from litestar.response import Response
 from litestar.status_codes import HTTP_200_OK, HTTP_201_CREATED
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,10 +71,25 @@ class AuthController(Controller):
             raise NotAuthorizedException("User account is inactive.")
 
         token = create_access_token(subject=str(user.id), is_superuser=user.is_superuser)
-        return TokenResponse(
+        token_response = TokenResponse(
             access_token=token,
             token_type="bearer",
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        )
+        return Response(
+            content=token_response,
+            status_code=HTTP_201_CREATED,
+            cookies=[
+                Cookie(
+                    key="access_token",
+                    value=token,
+                    max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                    httponly=True,
+                    samesite="lax",
+                    secure=settings.ENVIRONMENT == "production",
+                    path="/",
+                )
+            ],
         )
 
     @post(
@@ -85,7 +102,7 @@ class AuthController(Controller):
         self,
         request: Request,
         user_repo: IUserRepository,
-    ) -> TokenResponse:
+    ) -> Response[TokenResponse]:
         return await self._authenticate(request, user_repo)
 
     @post(
@@ -98,7 +115,7 @@ class AuthController(Controller):
         self,
         request: Request,
         user_repo: IUserRepository,
-    ) -> TokenResponse:
+    ) -> Response[TokenResponse]:
         return await self._authenticate(request, user_repo)
 
     @post(
@@ -108,10 +125,15 @@ class AuthController(Controller):
         summary="Revoke bearer token",
         description="Revoke the calling bearer token and invalidate in cache store.",
     )
-    async def logout(self, request: Request) -> dict[str, str]:
+    async def logout(self, request: Request) -> Response[dict[str, str]]:
         auth_header = request.headers.get("Authorization", "")
+        token = ""
         if auth_header.startswith("Bearer "):
             token = auth_header.removeprefix("Bearer ").strip()
+        elif "access_token" in request.cookies:
+            token = request.cookies["access_token"]
+
+        if token:
             claims = decode_access_token(token)
             if claims and "jti" in claims:
                 exp = claims.get("exp", 0)
@@ -120,4 +142,19 @@ class AuthController(Controller):
                     max(1, int(exp - now)) if exp else settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
                 )
                 await revoke_token(claims["jti"], expires_in=remaining)
-        return {"detail": "Token successfully revoked."}
+
+        return Response(
+            content={"detail": "Token successfully revoked."},
+            status_code=HTTP_200_OK,
+            cookies=[
+                Cookie(
+                    key="access_token",
+                    value="",
+                    max_age=0,
+                    httponly=True,
+                    samesite="lax",
+                    secure=settings.ENVIRONMENT == "production",
+                    path="/",
+                )
+            ],
+        )

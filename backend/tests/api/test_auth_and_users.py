@@ -124,6 +124,7 @@ class TestLogin:
         assert "access_token" in body
         assert body["token_type"] == "bearer"
         assert len(body["access_token"]) > 20  # non-trivial JWT
+        assert "access_token" in resp.cookies
 
     async def test_login_wrong_password(self, async_client: AsyncClient):
         await async_client.post(_REGISTER_URL, json=_BASE_USER)
@@ -151,6 +152,17 @@ class TestGetMe:
         resp = await async_client.get(
             _ME_URL,
             headers=_auth_headers(registered_user["token"]),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["email"] == registered_user["email"]
+        assert body["full_name"] == registered_user["full_name"]
+        assert body["is_active"] is True
+
+    async def test_get_me_with_cookie(self, registered_user, async_client: AsyncClient):
+        resp = await async_client.get(
+            _ME_URL,
+            cookies={"access_token": registered_user["token"]},
         )
         assert resp.status_code == 200, resp.text
         body = resp.json()

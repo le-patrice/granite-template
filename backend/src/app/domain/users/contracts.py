@@ -14,11 +14,11 @@ class IUserRepository(ABC):
         pass
 
     @abstractmethod
-    async def create(self, user: User) -> User:
+    async def create(self, user: User, *, auto_commit: bool = True) -> User:
         pass
 
     @abstractmethod
-    async def update(self, user: User) -> User:
+    async def update(self, user: User, *, auto_commit: bool = True) -> User:
         pass
 
     @abstractmethod
@@ -30,5 +30,5 @@ class IUserRepository(ABC):
         pass
 
     @abstractmethod
-    async def delete(self, user_id: uuid.UUID) -> bool:
+    async def delete(self, user_id: uuid.UUID, *, auto_commit: bool = True) -> bool:
         pass

@@ -18,12 +18,12 @@ class PostgresUserRepository(SQLAlchemyAsyncRepository[User], IUserRepository):
         result = await self.session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def create(self, user: User) -> User:
-        return await self.add(user, auto_commit=True)
+    async def create(self, user: User, *, auto_commit: bool = True) -> User:
+        return await self.add(user, auto_commit=auto_commit)
 
-    async def update(self, user: User) -> User:
-        # Delegate to advanced-alchemy's parent update implementation with auto_commit=True.
-        return await super().update(user, auto_commit=True)
+    async def update(self, user: User, *, auto_commit: bool = True) -> User:
+        # Delegate to advanced-alchemy's parent update implementation.
+        return await super().update(user, auto_commit=auto_commit)
 
     async def list_all(self, limit: int = 100, offset: int = 0) -> list[User]:
         statement = select(User).order_by(User.created_at.desc()).offset(offset).limit(limit)
@@ -35,9 +35,9 @@ class PostgresUserRepository(SQLAlchemyAsyncRepository[User], IUserRepository):
         result = await self.session.execute(statement)
         return int(result.scalar_one())
 
-    async def delete(self, user_id: uuid.UUID) -> bool:
+    async def delete(self, user_id: uuid.UUID, *, auto_commit: bool = True) -> bool:
         user = await self.get_by_id(user_id)
         if not user:
             return False
-        await super().delete(user_id, auto_commit=True)
+        await super().delete(user_id, auto_commit=auto_commit)
         return True

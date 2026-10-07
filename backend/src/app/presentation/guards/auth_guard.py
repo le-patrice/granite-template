@@ -32,15 +32,22 @@ class JWTAuthGuard:
         connection: ASGIConnection,
         handler: RouteHandlerType,
     ) -> None:
-        # Extract Authorization header
+        # Extract Authorization header or access_token cookie fallback
         auth_header = connection.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
+        if auth_header:
+            if not auth_header.startswith("Bearer "):
+                raise NotAuthorizedException(
+                    "Authorization header missing or malformed. "
+                    "Expected: 'Authorization: Bearer <token>'"
+                )
+            token = auth_header[len("Bearer ") :]
+        elif "access_token" in connection.cookies:
+            token = connection.cookies["access_token"]
+        else:
             raise NotAuthorizedException(
                 "Authorization header missing or malformed. "
-                "Expected: 'Authorization: Bearer <token>'"
+                "Expected: 'Authorization: Bearer <token>' or 'access_token' cookie."
             )
-
-        token = auth_header[len("Bearer ") :]
 
         # Decode & validate JWT (signature + expiry)
         try:

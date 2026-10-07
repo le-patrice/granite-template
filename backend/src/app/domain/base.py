@@ -14,14 +14,25 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, ClassVar
+from enum import Enum
+from typing import Any, ClassVar, Generic, TypeVar
 
-from sqlalchemy import DateTime, Integer, func
+import msgspec
+from sqlalchemy import CheckConstraint, DateTime, Integer, func
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import JSON, TypeDecorator, TypeEngine
 
-__all__ = ["AuditBase", "Base", "TenantBase", "VectorColumn"]
+__all__ = [
+    "AuditBase",
+    "Base",
+    "PaginationEnvelope",
+    "TenantBase",
+    "VectorColumn",
+    "enum_check_constraint",
+]
+
+T = TypeVar("T")
 
 
 # ---------------------------------------------------------------------------
@@ -140,3 +151,45 @@ class VectorColumn(TypeDecorator[list[float]]):
             # numpy / pgvector ndarray
             return list(value.tolist())
         return list(value)
+
+
+# ---------------------------------------------------------------------------
+# Generic Pagination Envelope
+# ---------------------------------------------------------------------------
+
+
+class PaginationEnvelope(msgspec.Struct, Generic[T], frozen=True):
+    """
+    Standard generic pagination envelope across all domains.
+    Guarantees consistent { items, total, limit, offset, pages } response structure.
+    """
+
+    items: list[T]
+    total: int
+    limit: int
+    offset: int
+
+    @property
+    def pages(self) -> int:
+        if self.limit <= 0:
+            return 1
+        return (self.total + self.limit - 1) // self.limit
+
+
+# ---------------------------------------------------------------------------
+# Enum Database Check Constraint Helper
+# ---------------------------------------------------------------------------
+
+
+def enum_check_constraint(
+    column_name: str,
+    enum_cls: type[Enum],
+    name: str | None = None,
+) -> CheckConstraint:
+    """
+    Generates a SQLAlchemy CheckConstraint enforcing that `column_name`
+    only contains valid string values from `enum_cls` directly in PostgreSQL DDL.
+    """
+    values = [f"'{e.value}'" for e in enum_cls]
+    constraint_name = name or f"ck_{column_name}_enum"
+    return CheckConstraint(f"{column_name} IN ({', '.join(values)})", name=constraint_name)

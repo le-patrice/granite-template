@@ -1,0 +1,19 @@
+[Unit]
+Description=Cloudflare Zero Trust Ingress Tunnel
+After=traefik.service
+Requires=traefik.service
+
+[Container]
+Image=docker.io/cloudflare/cloudflared:2024.12.0
+ContainerName=platform-cloudflared
+Pod=platform.pod
+Exec=tunnel --no-autoupdate run
+EnvironmentFile=/etc/platform/app.env
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=60
+
+[Install]
+WantedBy=default.target multi-user.target
