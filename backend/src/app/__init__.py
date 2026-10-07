@@ -2,6 +2,7 @@ import structlog
 from litestar import Litestar
 
 from app.adapters.cache.valkey_service import valkey_store
+from app.core.csrf import CSRFOriginMiddleware
 from app.core.database import alchemy_plugin
 from app.core.idempotency import IdempotencyMiddleware
 from app.core.logging import RequestLoggingMiddleware, setup_logging
@@ -89,6 +90,7 @@ async def init_admin_user() -> None:
 
 middleware_list = [
     RequestLoggingMiddleware,
+    CSRFOriginMiddleware,
     PrometheusMetricsMiddleware,
     IdempotencyMiddleware,
 ]

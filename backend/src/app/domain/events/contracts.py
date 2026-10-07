@@ -11,7 +11,15 @@ from app.domain.events.models import DeadLetterEvent, OutboxEvent
 
 
 class IOutboxRepository(Protocol):
-    async def create_event(self, event_type: str, payload_json: str) -> OutboxEvent: ...
+    async def create_event(
+        self,
+        event_type: str,
+        payload_json: str,
+        *,
+        organization_id: uuid.UUID | None = None,
+        aggregate_type: str = "general",
+        aggregate_id: uuid.UUID | None = None,
+    ) -> OutboxEvent: ...
 
     async def get_pending_events(self, limit: int = 50) -> list[OutboxEvent]: ...
 

@@ -48,6 +48,17 @@ class AppSettings(BaseSettings):
     # ── API Documentation UI ──────────────────────────────────────────────────
     DOCS_UI: str = "swagger"  # swagger | scalar | redoc | elements | rapidoc
 
+    # ── CSRF & Origin Security ────────────────────────────────────────────────
+    CSRF_PROTECTION_ENABLED: bool = True
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:8000",
+        "http://localhost:8080",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8080",
+    ]
+
     # ── Observability & Crash Reporting (Sentry) ──────────────────────────────
     SENTRY_DSN: str = ""
     SENTRY_ENVIRONMENT: str = "development"

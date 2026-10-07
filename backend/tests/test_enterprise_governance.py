@@ -13,15 +13,19 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
 from sqlalchemy import String, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm.exc import StaleDataError
 
+from app.core.csrf import CSRFOriginMiddleware
+from app.core.database import current_tenant_id, tenant_session
 from app.core.worker import poll_and_dispatch_outbox
 from app.domain.base import TenantBase
 from app.domain.events.models import OutboxEvent, OutboxStatus
 from app.domain.users.models import User
+from app.presentation.guards.auth_guard import tenant_required_guard
 
 
 # Generic tenant-scoped model inheriting from universal TenantBase
@@ -191,3 +195,143 @@ class TestOutboxWorkerLoop:
             assert row is not None
             assert row[0] == OutboxStatus.PROCESSED.value
             assert row[1] is not None
+
+
+@pytest.mark.asyncio
+class TestMultiTenantIsolationAndSession:
+    async def test_tenant_session_context_manager(self, db_session: AsyncSession):
+        tenant_id = uuid.uuid4()
+        user_id = uuid.uuid4()
+
+        assert current_tenant_id.get() == ""
+
+        async with tenant_session(
+            tenant_id, user_id=user_id, role="user", session=db_session
+        ) as session:
+            assert current_tenant_id.get() == str(tenant_id)
+            assert session.info["tenant_id"] == str(tenant_id)
+            assert session.info["user_id"] == str(user_id)
+
+            # Query should verify set_config applied
+            res = await session.execute(
+                text(
+                    "SELECT current_setting('app.current_user_id', true), "
+                    "current_setting('app.current_tenant_id', true), "
+                    "current_setting('app.current_role', true)"
+                )
+            )
+            row = res.fetchone()
+            assert row is not None
+            assert row[0] == str(user_id)
+            assert row[1] == str(tenant_id)
+            assert row[2] == "user"
+
+        # Contextvars must be completely reset after block
+        assert current_tenant_id.get() == ""
+
+    async def test_tenant_required_guard_blocks_empty_tenant(self):
+        class DummyConn:
+            def __init__(self, user_id=None, tenant_id=None, is_super=False, role="user"):
+                self.scope = {
+                    "user_id": user_id,
+                    "tenant_id": tenant_id,
+                    "is_superuser": is_super,
+                    "role": role,
+                }
+
+        # 1. Unauthenticated -> NotAuthorizedException
+        with pytest.raises(NotAuthorizedException):
+            tenant_required_guard(DummyConn(), None)
+
+        # 2. Authenticated user without tenant -> PermissionDeniedException
+        conn_no_tenant = DummyConn(user_id="user-123", tenant_id="")
+        with pytest.raises(PermissionDeniedException) as exc:
+            tenant_required_guard(conn_no_tenant, None)
+        assert "Multi-tenant context required" in str(exc.value)
+
+        # 3. Authenticated user with tenant -> passes
+        conn_with_tenant = DummyConn(user_id="user-123", tenant_id=str(uuid.uuid4()))
+        tenant_required_guard(conn_with_tenant, None)
+
+        # 4. Superuser without tenant -> passes
+        conn_super = DummyConn(user_id="admin-123", tenant_id="", is_super=True, role="superadmin")
+        tenant_required_guard(conn_super, None)
+
+
+@pytest.mark.asyncio
+class TestCSRFOriginSecurity:
+    async def test_csrf_blocks_cross_site_cookie_post(self):
+        called = False
+
+        async def dummy_app(scope, receive, send):
+            nonlocal called
+            called = True
+
+        middleware = CSRFOriginMiddleware(dummy_app)
+
+        received_events = []
+
+        async def send(event):
+            received_events.append(event)
+
+        # Cookie present, state-changing POST, cross-site header
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/resource",
+            "headers": [
+                (b"cookie", b"access_token=secret_jwt"),
+                (b"sec-fetch-site", b"cross-site"),
+                (b"origin", b"http://attacker.com"),
+            ],
+        }
+
+        await middleware(scope, None, send)
+        assert not called
+        assert len(received_events) > 0
+        assert received_events[0]["status"] == 403
+
+    async def test_csrf_allows_same_origin_cookie_post(self):
+        called = False
+
+        async def dummy_app(scope, receive, send):
+            nonlocal called
+            called = True
+
+        middleware = CSRFOriginMiddleware(dummy_app)
+
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/resource",
+            "headers": [
+                (b"cookie", b"access_token=secret_jwt"),
+                (b"origin", b"http://localhost:8000"),
+                (b"host", b"localhost:8000"),
+            ],
+        }
+
+        await middleware(scope, None, lambda event: None)
+        assert called
+
+    async def test_csrf_exempts_bearer_auth_without_cookie(self):
+        called = False
+
+        async def dummy_app(scope, receive, send):
+            nonlocal called
+            called = True
+
+        middleware = CSRFOriginMiddleware(dummy_app)
+
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/resource",
+            "headers": [
+                (b"authorization", b"Bearer some_token"),
+                (b"origin", b"http://external-partner.com"),
+            ],
+        }
+
+        await middleware(scope, None, lambda event: None)
+        assert called

@@ -27,12 +27,17 @@ session context is automatically cleared on COMMIT/ROLLBACK, guaranteeing 100% P
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from advanced_alchemy.config import AsyncSessionConfig, EngineConfig
 from advanced_alchemy.extensions.litestar.plugins import (
     SQLAlchemyAsyncConfig,
     SQLAlchemyInitPlugin,
 )
 from sqlalchemy import event, text
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.core.settings import settings
@@ -100,3 +105,48 @@ def set_tenant_context(session: Session, transaction: object, connection: object
         ),
         {"user_id": user_id, "tenant_id": tenant_id, "role": role},
     )
+
+
+# ---------------------------------------------------------------------------
+# Background Task & Worker Tenant Session Context Manager
+# ---------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def tenant_session(
+    tenant_id: str | uuid.UUID,
+    user_id: str | uuid.UUID | None = None,
+    role: str = "user",
+    is_superuser: bool = False,
+    session: AsyncSession | None = None,
+) -> AsyncIterator[AsyncSession]:
+    """
+    Async context manager that yields an AsyncSession scoped to a specific tenant.
+    Populates both contextvars and session.info, ensuring 100% isolation in SAQ
+    background jobs, outbox relays, and event subscribers without context leaks.
+    """
+    token_tenant = current_tenant_id.set(str(tenant_id))
+    token_user = current_user_id.set(str(user_id) if user_id else "")
+    token_role = current_role.set(role)
+    token_super = current_is_superuser.set(is_superuser)
+    try:
+        if session is not None:
+            session.info["tenant_id"] = str(tenant_id)
+            if user_id:
+                session.info["user_id"] = str(user_id)
+            session.info["role"] = role
+            session.info["is_superuser"] = is_superuser
+            yield session
+        else:
+            async with db_config.get_session() as s:
+                s.info["tenant_id"] = str(tenant_id)
+                if user_id:
+                    s.info["user_id"] = str(user_id)
+                s.info["role"] = role
+                s.info["is_superuser"] = is_superuser
+                yield s
+    finally:
+        current_tenant_id.reset(token_tenant)
+        current_user_id.reset(token_user)
+        current_role.reset(token_role)
+        current_is_superuser.reset(token_super)

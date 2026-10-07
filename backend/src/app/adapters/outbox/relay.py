@@ -28,14 +28,25 @@ class PostgresOutboxRepository(IOutboxRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def create_event(self, event_type: str, payload_json: str) -> OutboxEvent:
+    async def create_event(
+        self,
+        event_type: str,
+        payload_json: str,
+        *,
+        organization_id: uuid.UUID | None = None,
+        aggregate_type: str = "general",
+        aggregate_id: uuid.UUID | None = None,
+    ) -> OutboxEvent:
         event = OutboxEvent(
             event_type=event_type,
             payload_json=payload_json,
+            organization_id=organization_id,
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
             status=OutboxStatus.PENDING,
         )
         self.session.add(event)
-        await self.session.commit()
+        await self.session.flush()
         return event
 
     async def get_pending_events(self, limit: int = 50) -> list[OutboxEvent]:
@@ -145,7 +156,14 @@ class OutboxRelay:
         v_client = get_valkey_pool()
         channel = f"events:{event.event_type}"
         await v_client.publish(channel, event.payload_json)
-        logger.info("outbox.published", event_id=str(event.id), channel=channel)
+        logger.info(
+            "outbox.published",
+            event_id=str(event.id),
+            channel=channel,
+            organization_id=str(event.organization_id) if event.organization_id else None,
+            aggregate_type=event.aggregate_type,
+            aggregate_id=str(event.aggregate_id) if event.aggregate_id else None,
+        )
 
     async def process_sweep(self, batch_size: int = 50) -> int:
         events = await self.repo.get_pending_events(limit=batch_size)

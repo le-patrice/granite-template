@@ -125,10 +125,52 @@ class SuperuserGuard:
 # Standardized SuperAdminGuard alias
 SuperAdminGuard = SuperuserGuard
 
+
+def tenant_required_guard(connection: ASGIConnection, _: RouteHandlerType) -> None:
+    """
+    Asserts that the request has an explicit, valid tenant_id.
+    Prevents queries from executing with an empty tenant_id which would cause
+    PostgreSQL RLS policies to silently match 0 rows.
+    Superusers with is_superuser=True or role='superadmin' are exempt.
+    """
+    user_id = connection.scope.get("user_id")
+    if not user_id:
+        raise NotAuthorizedException("Authentication required.")
+    is_super = connection.scope.get("is_superuser", False)
+    role = connection.scope.get("role", "")
+    if is_super or role == "superadmin":
+        return
+    tenant_id = connection.scope.get("tenant_id")
+    if not tenant_id:
+        raise PermissionDeniedException(
+            "Multi-tenant context required: authenticated token does not contain a valid tenant/organization claim."
+        )
+
+
+class TenantRequiredGuard:
+    """
+    Composite guard that verifies JWT authentication and enforces that a non-empty
+    tenant context exists for non-superadmin users.
+    """
+
+    def __init__(self) -> None:
+        self._auth = JWTAuthGuard()
+
+    async def __call__(
+        self,
+        connection: ASGIConnection,
+        handler: RouteHandlerType,
+    ) -> None:
+        await self._auth(connection, handler)
+        tenant_required_guard(connection, handler)
+
+
 __all__ = [
     "JWTAuthGuard",
     "SuperAdminGuard",
     "SuperuserGuard",
+    "TenantRequiredGuard",
     "jwt_auth_guard",
     "superuser_guard",
+    "tenant_required_guard",
 ]
