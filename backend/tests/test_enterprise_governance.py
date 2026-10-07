@@ -16,6 +16,7 @@ import uuid
 import pytest
 from litestar.exceptions import NotAuthorizedException, PermissionDeniedException
 from sqlalchemy import String, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm.exc import StaleDataError
@@ -27,6 +28,22 @@ from app.domain.base import TenantBase
 from app.domain.events.models import OutboxEvent, OutboxStatus
 from app.domain.users.models import User
 from app.presentation.guards.auth_guard import tenant_required_guard
+
+
+def _runtime_role_url() -> str:
+    """Connection URL for the unprivileged app_runtime role on the same database as the app."""
+    base = os.environ.get("DIRECT_DATABASE_URL") or os.environ.get(
+        "DATABASE_URL",
+        "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db",
+    )
+    return (
+        make_url(base)
+        .set(
+            username="app_runtime",
+            password=os.environ.get("APP_RUNTIME_PASSWORD", "secure_dev_password"),
+        )
+        .render_as_string(hide_password=False)
+    )
 
 
 # Generic tenant-scoped model inheriting from universal TenantBase
@@ -374,11 +391,7 @@ class TestNonSuperuserRLSIsolation:
         Validates that connecting as the non-superuser 'app_runtime' role (NOSUPERUSER, NOBYPASSRLS)
         strictly enforces Row-Level Security: Tenant B cannot read rows created by Tenant A.
         """
-        db_url = os.environ.get(
-            "DATABASE_URL",
-            "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db",
-        )
-        runtime_url = db_url.replace("app_user:", "app_runtime:")
+        runtime_url = _runtime_role_url()
         runtime_engine = create_async_engine(runtime_url)
 
         tenant_a = uuid.uuid4()
@@ -494,11 +507,7 @@ class TestUnitOfWorkHelper:
 @pytest.mark.asyncio
 class TestStrictTenantRLSProcedure:
     async def test_attach_tenant_rls_strict_rejects_null_tenant(self, async_engine):
-        db_url = os.environ.get(
-            "DATABASE_URL",
-            "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db",
-        )
-        runtime_url = db_url.replace("app_user:", "app_runtime:")
+        runtime_url = _runtime_role_url()
         runtime_engine = create_async_engine(runtime_url)
 
         tenant_a = uuid.uuid4()

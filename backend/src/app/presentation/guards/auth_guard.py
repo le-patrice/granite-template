@@ -91,6 +91,9 @@ class JWTAuthGuard:
 
 jwt_auth_guard = JWTAuthGuard()
 
+# Explicit name for "any authenticated user, no tenant or role requirement".
+require_authenticated = jwt_auth_guard
+
 
 def superuser_guard(connection: ASGIConnection, _: RouteHandlerType) -> None:
     """
@@ -171,6 +174,7 @@ __all__ = [
     "SuperuserGuard",
     "TenantRequiredGuard",
     "jwt_auth_guard",
+    "require_authenticated",
     "superuser_guard",
     "tenant_required_guard",
 ]

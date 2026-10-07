@@ -13,6 +13,8 @@ Changes
 4. Creates reusable attach_audit_trigger(target_table TEXT) migration helper.
 """
 
+import os
+
 from alembic import op
 
 revision: str = "0006"
@@ -25,17 +27,22 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     # 1. Provision non-superuser app_runtime role for RLS enforcement
     # ------------------------------------------------------------------
+    # Password is overridable per environment; database name is resolved at runtime
+    # so the migration works for any scaffolded project (never hardcode the DB name).
+    runtime_password = os.environ.get("APP_RUNTIME_PASSWORD", "secure_dev_password").replace(
+        "'", "''"
+    )
     op.execute(
-        """
+        f"""
         DO $$
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_runtime') THEN
-                CREATE ROLE app_runtime WITH LOGIN PASSWORD 'secure_dev_password'
+                CREATE ROLE app_runtime WITH LOGIN PASSWORD '{runtime_password}'
                 NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
             END IF;
+            EXECUTE format('GRANT CONNECT ON DATABASE %I TO app_runtime', current_database());
         END $$;
 
-        GRANT CONNECT ON DATABASE app_db TO app_runtime;
         GRANT USAGE ON SCHEMA public TO app_runtime;
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime;
         GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_runtime;
