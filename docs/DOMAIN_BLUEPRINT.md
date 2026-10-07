@@ -1115,6 +1115,7 @@ The platform uses a two-tier defense-in-depth throttling model combining edge ne
           ▼
 ┌────────────────────────────────────────────────────────┐
 │  Tier 2: Valkey Lua Sliding-Window Counter             │
+│  - Exemptions: /health*, /metrics, /docs*, /schema*    │
 │  - Category "auth" (/api/v1/auth/*)     -> 5 req/min   │
 │  - Category "webhook" (/api/v1/hook/*)  -> 500 req/min │
 │  - Category "api" (General Endpoints)   -> 120 req/min │

@@ -52,6 +52,18 @@ def extract_client_ip(scope: Scope) -> str:
     return "127.0.0.1"
 
 
+RATE_LIMIT_EXEMPT_PREFIXES: tuple[str, ...] = (
+    "/health",
+    "/metrics",
+    "/docs",
+    "/schema",
+    "/scalar",
+    "/swagger",
+    "/elements",
+    "/favicon.ico",
+)
+
+
 class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
     """Sliding-window atomic rate limiter evaluating traffic quotas per category and IP."""
 
@@ -64,6 +76,13 @@ class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
             return
 
         path = scope.get("path", "")
+
+        # Infrastructure bypass: health checks, readiness/liveness/startup probes,
+        # prometheus metrics, and API schema docs must never be throttled by IP rate limits.
+        if path.startswith(RATE_LIMIT_EXEMPT_PREFIXES):
+            await self.app(scope, receive, send)
+            return
+
         # Determine quota policy
         if "/api/v1/auth/login" in path:
             limit = 5

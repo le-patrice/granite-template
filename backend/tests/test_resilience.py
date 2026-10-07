@@ -215,3 +215,13 @@ class TestSlidingWindowRateLimiter:
             sixth.headers.get("RateLimit-Remaining") == "0"
             or sixth.headers.get("ratelimit-remaining") == "0"
         )
+
+    async def test_health_endpoints_are_exempt_from_rate_limiting(
+        self, async_client: AsyncClient
+    ) -> None:
+        unique_ip = f"198.51.100.{uuid.uuid4().hex[:4]}"
+        headers = {"X-Forwarded-For": unique_ip}
+        for path in ("/health", "/health/ready", "/health/live", "/health/startup"):
+            for _ in range(15):
+                resp = await async_client.get(path, headers=headers)
+                assert resp.status_code == 200, f"Expected 200 for {path}, got {resp.status_code}"
