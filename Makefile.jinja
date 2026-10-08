@@ -509,7 +509,7 @@ db-backup-verify: ## Test integrity of a compressed backup file (e.g., make db-b
 	@gzip -dc "$(FILE)" | head -n 15
 
 .PHONY: db-restore
-db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups/db.sql.gz DB=app_db)
+db-restore: ## Restore backup into target DB (e.g., make db-restore FILE=backups/db.sql.gz DB={{ postgres_db }})
 	@if [ -z "$(FILE)" ] || [ ! -f "$(FILE)" ]; then \
 		echo -e "$(RED)❌ Valid FILE path required.$(NC) Usage: make db-restore FILE=backups/db.sql.gz DB=target_db"; \
 		exit 1; \

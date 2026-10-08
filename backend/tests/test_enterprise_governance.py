@@ -34,7 +34,7 @@ def _runtime_role_url() -> str:
     """Connection URL for the unprivileged app_runtime role on the same database as the app."""
     base = os.environ.get("DIRECT_DATABASE_URL") or os.environ.get(
         "DATABASE_URL",
-        "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db",
+        settings.direct_db_url,
     )
     return (
         make_url(base)

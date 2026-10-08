@@ -33,9 +33,10 @@ import os
 from pathlib import Path
 
 import pytest
+from alembic import command as alembic_cmd
 from alembic.config import Config as AlembicConfig
 
-from alembic import command as alembic_cmd
+from app.core.settings import settings
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,9 +48,9 @@ _ALEMBIC_INI = _BACKEND_ROOT / "alembic.ini"
 
 def _sync_dsn() -> str:
     """Return a psycopg2-compatible DSN derived from the env DATABASE_URL."""
-    url = os.environ.get(
+    url = os.environ.get("DIRECT_DATABASE_URL") or os.environ.get(
         "DATABASE_URL",
-        "postgresql+asyncpg://app_user:secure_dev_password@localhost:5432/app_db",
+        settings.direct_db_url,
     )
     return url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
