@@ -23,6 +23,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.csrf import CSRFOriginMiddleware
 from app.core.database import current_tenant_id, tenant_session, unit_of_work
+from app.core.settings import settings
 from app.core.worker import poll_and_dispatch_outbox
 from app.domain.base import TenantBase
 from app.domain.events.models import OutboxEvent, OutboxStatus

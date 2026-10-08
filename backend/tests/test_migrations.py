@@ -33,9 +33,9 @@ import os
 from pathlib import Path
 
 import pytest
-from alembic import command as alembic_cmd
 from alembic.config import Config as AlembicConfig
 
+from alembic import command as alembic_cmd
 from app.core.settings import settings
 
 # ---------------------------------------------------------------------------
