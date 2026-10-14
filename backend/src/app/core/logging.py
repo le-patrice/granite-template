@@ -1,8 +1,9 @@
 import logging
 import os
+import queue
 import sys
 import time
-from logging.handlers import RotatingFileHandler
+from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 
 import structlog
 from litestar.enums import ScopeType
@@ -11,8 +12,12 @@ from litestar.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.settings import settings
 
+_log_queue: queue.Queue = queue.Queue(maxsize=10000)
+_log_listener: QueueListener | None = None
+
 
 def setup_logging() -> None:
+    global _log_listener
     log_dir = "logs"
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
 
@@ -24,7 +29,14 @@ def setup_logging() -> None:
             backupCount=5,
             encoding="utf-8",
         )
-        handlers.append(file_handler)
+        # Offload file I/O to background thread using non-blocking QueueHandler/QueueListener
+        # Prevents disk rotation and synchronous write stalls on the asyncio event loop
+        async_handler = QueueHandler(_log_queue)
+        handlers.append(async_handler)
+        if _log_listener is not None:
+            _log_listener.stop()
+        _log_listener = QueueListener(_log_queue, file_handler, respect_handler_level=True)
+        _log_listener.start()
     except OSError:
         pass
 
@@ -82,7 +94,7 @@ def extract_client_ip(scope: Scope) -> str:
 
 
 class RequestLoggingMiddleware(AbstractMiddleware):
-    """ASGI Middleware to log every incoming HTTP request/response cycle in real time."""
+    """ASGI Middleware to log incoming HTTP request/response cycle in real time."""
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
@@ -94,6 +106,12 @@ class RequestLoggingMiddleware(AbstractMiddleware):
             return
 
         path = scope.get("path", "")
+
+        # Skip noisy infrastructure probe logging to eliminate event loop stalls
+        if path.startswith(("/health", "/metrics")):
+            await self.app(scope, receive, send)
+            return
+
         method = scope.get("method", "GET")
         client_ip = extract_client_ip(scope)
         start_time = time.monotonic()
