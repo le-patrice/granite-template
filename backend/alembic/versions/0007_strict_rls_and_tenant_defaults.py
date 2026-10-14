@@ -35,12 +35,12 @@ def upgrade() -> None:
                 'CREATE POLICY tenant_isolation_policy ON %I ' ||
                 'FOR ALL TO PUBLIC ' ||
                 'USING ( ' ||
-                '    current_setting(''app.current_role'', true) = ''superadmin'' ' ||
-                '    OR organization_id = NULLIF(current_setting(''app.current_tenant_id'', true), '''')::uuid ' ||
+                '    (SELECT current_setting(''app.current_role'', true)) = ''superadmin'' ' ||
+                '    OR organization_id = (SELECT NULLIF(current_setting(''app.current_tenant_id'', true), '''')::uuid) ' ||
                 ') ' ||
                 'WITH CHECK ( ' ||
-                '    current_setting(''app.current_role'', true) = ''superadmin'' ' ||
-                '    OR organization_id = NULLIF(current_setting(''app.current_tenant_id'', true), '''')::uuid ' ||
+                '    (SELECT current_setting(''app.current_role'', true)) = ''superadmin'' ' ||
+                '    OR organization_id = (SELECT NULLIF(current_setting(''app.current_tenant_id'', true), '''')::uuid) ' ||
                 ');',
                 target_table, target_table
             );
