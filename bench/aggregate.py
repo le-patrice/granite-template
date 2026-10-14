@@ -50,7 +50,7 @@ for (label, w, rate, batch), runs in cells.items():
         "max_ms_med": med(g("max_ms")), "err_pct_med": 100 * med(g("error_rate")),
         "dropped_med": med(g("dropped_iterations")),
     }
-    for c in ("app", "telemetry-ingest", "postgres-db", "pgbouncer", "valkey-cache", "worker", "traefik"):
+    for c in ("app", "telemetry-ingest", "postgres-db", "pgbouncer", "valkey-cache", "worker", "traefik", "go-baseline"):
         row[f"cpu_{c}"] = round(med([r["_cpu"].get(c, float("nan")) for r in runs]), 1)
         row[f"rss_mb_{c}"] = round(med([r["_mem"].get(c, 0) / 1e6 for r in runs]), 1)
     rows.append(row)

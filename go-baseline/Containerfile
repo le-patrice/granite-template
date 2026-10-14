@@ -1,0 +1,17 @@
+FROM docker.io/library/golang:1.24-alpine AS builder
+WORKDIR /build
+
+COPY go.mod go.sum* ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o go-baseline .
+
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /app
+COPY --from=builder /build/go-baseline /app/go-baseline
+EXPOSE 8002
+USER nonroot:nonroot
+ENTRYPOINT ["/app/go-baseline"]
