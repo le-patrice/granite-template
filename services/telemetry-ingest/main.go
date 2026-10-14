@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -31,8 +34,50 @@ type TelemetryRecord struct {
 }
 
 type Server struct {
-	dbPool *pgxpool.Pool
-	valkey *redis.Client
+	dbPool    *pgxpool.Pool
+	valkey    *redis.Client
+	secretKey string
+}
+
+type JWTClaims struct {
+	Sub string `json:"sub"`
+	Exp int64  `json:"exp"`
+}
+
+func verifyJWT(authHeader, secretKey string) bool {
+	if secretKey == "" {
+		return true
+	}
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return false
+	}
+	tokenStr := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) != 3 {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, []byte(secretKey))
+	mac.Write([]byte(parts[0] + "." + parts[1]))
+	expectedSig := mac.Sum(nil)
+
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil || !hmac.Equal(expectedSig, sig) {
+		return false
+	}
+
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return false
+	}
+	var claims JWTClaims
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return false
+	}
+	if claims.Exp > 0 && claims.Exp < time.Now().Unix() {
+		return false
+	}
+	return true
 }
 
 func main() {
@@ -82,9 +127,12 @@ func main() {
 		log.Println("Connected to Valkey in-memory cache")
 	}
 
+	secretKey := getEnv("SECRET_KEY", "")
+
 	srv := &Server{
-		dbPool: dbPool,
-		valkey: valkeyClient,
+		dbPool:    dbPool,
+		valkey:    valkeyClient,
+		secretKey: secretKey,
 	}
 
 	// 3. Register HTTP Routes
@@ -122,9 +170,22 @@ func main() {
 }
 
 func (s *Server) handleTelemetryIngest(w http.ResponseWriter, r *http.Request) {
+	// 0. Enforce JWT Bearer authentication
+	if s.secretKey != "" && !verifyJWT(r.Header.Get("Authorization"), s.secretKey) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized: valid Bearer token required"})
+		return
+	}
+
+	// 1. Enforce strict max body size (4 MB)
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+
 	var records []TelemetryRecord
 	if err := json.NewDecoder(r.Body).Decode(&records); err != nil {
-		http.Error(w, `{"error":"Invalid JSON payload: expected list of telemetry records"}`, http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON payload: expected list of telemetry records"})
 		return
 	}
 
@@ -133,6 +194,16 @@ func (s *Server) handleTelemetryIngest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]any{"accepted": 0, "transformers_updated": 0})
 		return
+	}
+
+	// 2. Validate input fields
+	for _, rec := range records {
+		if rec.TransformerID == "" || rec.VoltageV < 0 || rec.FrequencyHz <= 0 || rec.TimestampEpoch <= 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Validation failed: invalid telemetry record attributes"})
+			return
+		}
 	}
 
 	now := time.Now().UTC()

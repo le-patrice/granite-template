@@ -64,6 +64,9 @@ def main() -> None:
             c.setdefault("env", []).append({"name": "RATE_LIMIT_ENABLED", "value": "false"})
         if name == "telemetry-ingest":
             c["ports"] = [{"containerPort": 8001, "hostPort": 18001}]
+            if not any(e["name"] == "SECRET_KEY" for e in c.get("env", [])):
+                secret = "d4b701543ffa55b4423be1d7993a4e3f6efdf8eaaf406165eee1c37d59ad3974"
+                c.setdefault("env", []).append({"name": "SECRET_KEY", "value": secret})
         if name == "postgres-db":
             pg_args = list(args.pg_arg)
             if not any(x.startswith("max_connections=") for x in pg_args):

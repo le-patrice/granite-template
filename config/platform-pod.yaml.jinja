@@ -277,6 +277,8 @@ spec:
           value: "8001"
         - name: DATABASE_URL
           value: postgres://{{ postgres_user }}:{{ postgres_password }}@127.0.0.1:5432/{{ postgres_db }}?sslmode=disable
+        - name: SECRET_KEY
+          value: "{{ secret_key }}"
         {% if include_valkey %}
         - name: VALKEY_HOST
           value: 127.0.0.1
