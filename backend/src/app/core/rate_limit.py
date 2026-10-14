@@ -69,6 +69,9 @@ class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
+        valkey_client = get_valkey_pool()
+        self._valkey_client = valkey_client
+        self._script = valkey_client.register_script(LUA_SLIDING_WINDOW) if valkey_client is not None else None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -105,10 +108,16 @@ class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
         key_prev = f"rl:{category}:{client_ip}:{prev_window}"
 
         try:
-            valkey_client = get_valkey_pool()
-            result = await valkey_client.eval(
-                LUA_SLIDING_WINDOW, 2, key_current, key_prev, limit, current_weight
-            )
+            if self._script is not None:
+                result = await self._script(
+                    keys=[key_current, key_prev],
+                    args=[limit, current_weight],
+                )
+            else:
+                valkey_client = get_valkey_pool()
+                result = await valkey_client.eval(
+                    LUA_SLIDING_WINDOW, 2, key_current, key_prev, limit, current_weight
+                )
             allowed, remaining, _total = result[0], result[1], result[2]
         except Exception as exc:  # noqa: BLE001
             logger.warning("ratelimit.valkey_error", error=str(exc))
