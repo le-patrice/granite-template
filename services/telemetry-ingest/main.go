@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -94,8 +93,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to parse database config: %v", err)
 	}
-	poolConfig.MaxConns = 30
-	poolConfig.MinConns = 5
+	poolConfig.MaxConns = 15
+	poolConfig.MinConns = 2
 	poolConfig.MaxConnLifetime = 30 * time.Minute
 	poolConfig.MaxConnIdleTime = 5 * time.Minute
 
@@ -248,27 +247,26 @@ func (s *Server) handleTelemetryIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── 2. Fan-out latest state per transformer to Valkey concurrently ────────
-	var wg sync.WaitGroup
-	pipe := s.valkey.Pipeline()
-	const stateTTL = 24 * time.Hour
+	// ── 2. Fan-out latest state per transformer to Valkey pipeline with timeout ──
+	if len(latestMap) > 0 {
+		pipe := s.valkey.Pipeline()
+		const stateTTL = 24 * time.Hour
 
-	for tid, rec := range latestMap {
-		data, err := json.Marshal(rec)
-		if err == nil {
-			key := fmt.Sprintf("transformer:state:%s", tid)
-			pipe.Set(r.Context(), key, data, stateTTL)
+		for tid, rec := range latestMap {
+			data, err := json.Marshal(rec)
+			if err == nil {
+				key := fmt.Sprintf("transformer:state:%s", tid)
+				pipe.Set(r.Context(), key, data, stateTTL)
+			}
 		}
-	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if _, pipeErr := pipe.Exec(context.Background()); pipeErr != nil {
+		pipeCtx, pipeCancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		_, pipeErr := pipe.Exec(pipeCtx)
+		pipeCancel()
+		if pipeErr != nil {
 			log.Printf("Valkey pipeline cache update error: %v", pipeErr)
 		}
-	}()
-	wg.Wait()
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
