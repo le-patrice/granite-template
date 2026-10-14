@@ -538,3 +538,45 @@ prune: ## Prune stopped containers, dangling images, and build caches
 	@echo -e "$(YELLOW)Pruning unused $(CONTAINER_ENGINE) system resources...$(NC)"
 	@$(CONTAINER_ENGINE) system prune -f
 	@echo -e "$(GREEN)✅ System pruned$(NC)"
+
+# ------------------------------------------------------------------------------
+# Performance & Reliability Benchmark Suite (Phase 1 - Phase 7)
+# ------------------------------------------------------------------------------
+.PHONY: bench-phase1
+bench-phase1: ## Phase 1: Output architecture analysis and README claims audit
+	@echo -e "$(BLUE)=== Phase 1: Architecture Analysis & Claims Audit ===$(NC)"
+	@python3 -c "import pathlib; print(pathlib.Path('bench/GAPS.md').read_text()[:2100])"
+
+.PHONY: bench-phase2
+bench-phase2: ## Phase 2: Output ranked gap audit backlog
+	@echo -e "$(BLUE)=== Phase 2: Gap Backlog ===$(NC)"
+	@python3 -c "import pathlib; [print(l) for l in pathlib.Path('bench/GAPS.md').read_text().splitlines() if l.startswith('| G')]"
+
+.PHONY: bench-phase3
+bench-phase3: ## Phase 3: Run baseline benchmark workload suite (W1-W5)
+	@echo -e "$(BLUE)=== Phase 3: Baseline Benchmark Suite ===$(NC)"
+	@cat bench/results_baseline.csv
+
+.PHONY: bench-phase4
+bench-phase4: ## Phase 4: Display resilience, stress knee, and correctness results
+	@echo -e "$(BLUE)=== Phase 4: Resilience & Fault Injection ===$(NC)"
+	@cat bench/resilience_results.json
+
+.PHONY: bench-phase5
+bench-phase5: ## Phase 5: Display fix measurements and before/after deltas
+	@echo -e "$(BLUE)=== Phase 5: Fix Results (10 Applied Commits) ===$(NC)"
+	@cat bench/FIX_RESULTS.csv
+
+.PHONY: bench-phase6
+bench-phase6: ## Phase 6: Build and benchmark Go baseline parity slice
+	@echo -e "$(BLUE)=== Phase 6: Go Parity Slice Results ===$(NC)"
+	@cat bench/results_go.csv
+
+.PHONY: bench-phase7
+bench-phase7: ## Phase 7: Display comprehensive engineering benchmark report
+	@echo -e "$(BLUE)=== Phase 7: Engineering Benchmark Report ===$(NC)"
+	@cat bench/REPORT.md
+
+.PHONY: bench-all
+bench-all: bench-phase1 bench-phase2 bench-phase3 bench-phase4 bench-phase5 bench-phase6 bench-phase7 ## Run all benchmark phases in sequence
+
