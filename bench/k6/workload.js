@@ -58,6 +58,8 @@ export default function () {
       res = http.patch(`${BASE}/api/v1/users/me`, JSON.stringify({ full_name: 'dup' }),
         auth(t.token, { 'Idempotency-Key': `dup-${__ENV.RUNID || 'r'}-${__ITER % 50}` })); break;
     case 'w4':
+    case 'w4go':
+    case 'w4_go':
       res = http.post(`${BASE}/api/v1/telemetry/ingest`, JSON.stringify(records(BATCH)), auth(T.super)); break;
     case 'w5': // login (Argon2id)
       res = http.post(`${BASE}/api/v1/auth/login`,

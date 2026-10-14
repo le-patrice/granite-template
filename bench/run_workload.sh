@@ -9,7 +9,7 @@ TOK=${TOKENS:-$HOME/bench-run/bench-data/tokens.json}
 HERE=$(cd "$(dirname "$0")" && pwd)
 POD=${POD:-bench-stack-pod}
 mkdir -p "$OUT/raw"
-suffix=""; [ "$W" = w4 ] && suffix="__b${BATCH}"
+suffix=""; [[ "$W" =~ ^w4 ]] && suffix="__b${BATCH}"
 
 sample() { # background container stats sampler -> csv (ts,name,cpu%,mem_bytes)
   while true; do
