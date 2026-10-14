@@ -34,24 +34,61 @@ class PostgresTelemetryRepository(ITelemetryRepository):
 
         now = datetime.now(UTC)
 
-        # Build a list of dicts matching the column names
+        # 1. Pre-allocate tuples for binary PostgreSQL CopyFrom protocol
         rows = [
-            {
-                "id": str(uuid.uuid4()),
-                "transformer_id": r.transformer_id,
-                "voltage_v": r.voltage_v,
-                "current_a": r.current_a,
-                "power_factor": r.power_factor,
-                "frequency_hz": r.frequency_hz,
-                # Convert Unix epoch float → UTC datetime
-                "recorded_at": datetime.fromtimestamp(r.timestamp_epoch, tz=UTC),
-                "ingested_at": now,
-            }
+            (
+                uuid.uuid4(),
+                r.transformer_id,
+                r.voltage_v,
+                r.current_a,
+                r.power_factor,
+                r.frequency_hz,
+                datetime.fromtimestamp(r.timestamp_epoch, tz=UTC),
+                now,
+            )
             for r in records
         ]
 
-        # Single-statement bulk insert; asyncpg sends this as one server
-        # round-trip regardless of batch size.
+        # 2. Fast-path: Binary COPY via asyncpg driver connection
+        try:
+            conn = await self.session.connection()
+            raw_conn = await conn.get_raw_connection()
+            driver = getattr(raw_conn, "driver_connection", None)
+            if driver is not None and hasattr(driver, "copy_records_to_table"):
+                await driver.copy_records_to_table(
+                    "telemetry_readings",
+                    records=rows,
+                    columns=[
+                        "id",
+                        "transformer_id",
+                        "voltage_v",
+                        "current_a",
+                        "power_factor",
+                        "frequency_hz",
+                        "recorded_at",
+                        "ingested_at",
+                    ],
+                )
+                await self.session.commit()
+                return
+        except Exception:
+            # Fallback to standard parameterised insert if driver COPY is unavailable
+            pass
+
+        # 3. Fallback: single-statement bulk insert
+        dict_rows = [
+            {
+                "id": str(r[0]),
+                "transformer_id": r[1],
+                "voltage_v": r[2],
+                "current_a": r[3],
+                "power_factor": r[4],
+                "frequency_hz": r[5],
+                "recorded_at": r[6],
+                "ingested_at": r[7],
+            }
+            for r in rows
+        ]
         stmt = text(
             """
             INSERT INTO telemetry_readings
@@ -64,5 +101,5 @@ class PostgresTelemetryRepository(ITelemetryRepository):
             """
         )
 
-        await self.session.execute(stmt, rows)
+        await self.session.execute(stmt, dict_rows)
         await self.session.commit()
