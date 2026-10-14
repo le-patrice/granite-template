@@ -64,9 +64,12 @@ def main() -> None:
             c.setdefault("env", []).append({"name": "RATE_LIMIT_ENABLED", "value": "false"})
         if name == "telemetry-ingest":
             c["ports"] = [{"containerPort": 8001, "hostPort": 18001}]
-        if name == "postgres-db" and args.pg_arg:
-            c["args"] = ["postgres"] + [x for kv in args.pg_arg for x in ("-c", kv)]
-            log.append(f"postgres args: {args.pg_arg}")
+        if name == "postgres-db":
+            pg_args = list(args.pg_arg)
+            if not any(x.startswith("max_connections=") for x in pg_args):
+                pg_args.append("max_connections=200")
+            c["args"] = ["postgres"] + [x for kv in pg_args for x in ("-c", kv)]
+            log.append(f"postgres args: {pg_args}")
         if name == "pgbouncer" and args.pgb:
             for kv in args.pgb:
                 k, v = kv.split("=", 1)
