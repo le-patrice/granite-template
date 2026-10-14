@@ -73,6 +73,20 @@ class PostgresOutboxRepository(IOutboxRepository):
         await self.session.execute(stmt)
         await self.session.commit()
 
+    async def mark_batch_processed(self, event_ids: list[uuid.UUID]) -> None:
+        if not event_ids:
+            return
+        stmt = (
+            update(OutboxEvent)
+            .where(OutboxEvent.id.in_(event_ids))
+            .values(
+                status=OutboxStatus.PROCESSED,
+                processed_at=datetime.now(UTC),
+            )
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
+
     async def record_failure(
         self, event_id: uuid.UUID, error_trace: str, max_retries: int = 3
     ) -> None:
@@ -170,18 +184,22 @@ class OutboxRelay:
         if not events:
             return 0
 
-        processed = 0
+        successful_ids: list[uuid.UUID] = []
         for event in events:
             try:
                 await self.publish_event(event)
-                await self.repo.mark_processed(event.id)
-                processed += 1
+                successful_ids.append(event.id)
             except Exception as exc:  # noqa: BLE001
                 tb = traceback.format_exc()
                 logger.error("outbox.publish_failed", event_id=str(event.id), error=str(exc))
                 await self.repo.record_failure(event.id, error_trace=tb)
 
-        return processed
+        # Batch mark all successfully published events in a single transaction
+        # Preserves FOR UPDATE SKIP LOCKED across the entire sweep and avoids lock release race
+        if successful_ids:
+            await self.repo.mark_batch_processed(successful_ids)
+
+        return len(successful_ids)
 
     @staticmethod
     async def ensure_notify_trigger(session: AsyncSession) -> None:
