@@ -52,34 +52,40 @@ class IdempotencyMiddleware(AbstractMiddleware):
             await self.app(scope, receive, send)
             return
 
-        cache_key = f"idempotency:{idempotency_key}"
+        # Scope idempotency key by method, path, and client auth context to prevent cross-tenant/user key collisions
+        auth_hdr = headers.get("authorization", "")
+        auth_scope = auth_hdr[-16:] if auth_hdr else "anon"
+        cache_key = f"idempotency:{scope['method']}:{scope['path']}:{auth_scope}:{idempotency_key}"
         valkey_client = self.valkey_client
 
         if valkey_client is not None:
             try:
-                cached_data = await valkey_client.get(cache_key)
-                if cached_data:
-                    record = json.loads(cached_data)
-                    if record.get("status") == "IN_PROGRESS":
-                        # In-flight concurrent request
-                        await self._send_json_response(
-                            send,
-                            status_code=HTTP_409_CONFLICT,
-                            payload={
-                                "detail": "A request with this Idempotency-Key is currently in progress."
-                            },
-                        )
-                        return
-
-                    if record.get("status") == "COMPLETED":
-                        # Return cached response
-                        logger.info("idempotency.cache_hit", key=idempotency_key)
-                        await self._send_cached_response(send, record)
-                        return
-
-                # Acquire in-flight lock
+                # 1. Atomically attempt to acquire in-flight lock using SET NX
+                # Eliminates check-then-set race window and saves 1 Valkey RTT on cache misses
                 in_progress_record = json.dumps({"status": "IN_PROGRESS"})
-                await valkey_client.set(cache_key, in_progress_record, ex=LOCK_TTL_SECONDS)
+                acquired = await valkey_client.set(cache_key, in_progress_record, nx=True, ex=LOCK_TTL_SECONDS)
+
+                if not acquired:
+                    # Key already exists: fetch existing status (IN_PROGRESS or COMPLETED)
+                    cached_data = await valkey_client.get(cache_key)
+                    if cached_data:
+                        record = json.loads(cached_data)
+                        if record.get("status") == "IN_PROGRESS":
+                            # In-flight concurrent request
+                            await self._send_json_response(
+                                send,
+                                status_code=HTTP_409_CONFLICT,
+                                payload={
+                                    "detail": "A request with this Idempotency-Key is currently in progress."
+                                },
+                            )
+                            return
+
+                        if record.get("status") == "COMPLETED":
+                            # Return cached response
+                            logger.info("idempotency.cache_hit", key=idempotency_key)
+                            await self._send_cached_response(send, record)
+                            return
             except Exception as exc:  # noqa: BLE001
                 logger.warning("idempotency.valkey_error", error=str(exc))
 
