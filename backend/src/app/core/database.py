@@ -50,7 +50,7 @@ db_config = SQLAlchemyAsyncConfig(
     connection_string=settings.DATABASE_URL,
     session_config=AsyncSessionConfig(expire_on_commit=False),
     engine_config=EngineConfig(
-        pool_pre_ping=True,
+        pool_pre_ping=False,  # PgBouncer transaction pool handles connection health; redundant SELECT 1 adds 1 RTT per request
         pool_recycle=1800,
         pool_size=settings.DB_POOL_SIZE,
         max_overflow=settings.DB_MAX_OVERFLOW,
