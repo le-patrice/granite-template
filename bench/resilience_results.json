@@ -1,0 +1,139 @@
+{
+  "stress": {
+    "workload": "w1",
+    "knee_rate": 1000,
+    "steps": [
+      {
+        "workload": "w1",
+        "base": "http://127.0.0.1:18000",
+        "target_rate": 200,
+        "batch": 100,
+        "achieved_rps": 199.9680196145431,
+        "requests": 2000,
+        "dropped_iterations": 0,
+        "error_rate": 0,
+        "p50_ms": 2.4521495,
+        "p90_ms": 3.4599164,
+        "p95_ms": 3.9394935,
+        "p99_ms": 10.04894102,
+        "max_ms": 21.923445,
+        "max_vus": 200
+      },
+      {
+        "workload": "w1",
+        "base": "http://127.0.0.1:18000",
+        "target_rate": 500,
+        "batch": 100,
+        "achieved_rps": 499.7744834350052,
+        "requests": 5001,
+        "dropped_iterations": 0,
+        "error_rate": 0,
+        "p50_ms": 3.17254,
+        "p90_ms": 10.212558,
+        "p95_ms": 16.596546,
+        "p99_ms": 36.107225,
+        "max_ms": 85.340558,
+        "max_vus": 400
+      },
+      {
+        "workload": "w1",
+        "base": "http://127.0.0.1:18000",
+        "target_rate": 1000,
+        "batch": 100,
+        "achieved_rps": 174.8390333003138,
+        "requests": 6994,
+        "dropped_iterations": 2912,
+        "error_rate": 0,
+        "p50_ms": 1148.9744625,
+        "p90_ms": 1593.4766309,
+        "p95_ms": 2527.6131423499996,
+        "p99_ms": 2819.654285809999,
+        "max_ms": 16603.163194,
+        "max_vus": 1119
+      }
+    ]
+  },
+  "spike": {
+    "pre": {
+      "workload": "w1",
+      "base": "http://127.0.0.1:18000",
+      "target_rate": 200,
+      "batch": 100,
+      "achieved_rps": 200.029423918403,
+      "requests": 2001,
+      "dropped_iterations": 0,
+      "error_rate": 0,
+      "p50_ms": 2.292368,
+      "p90_ms": 2.86633,
+      "p95_ms": 3.416092,
+      "p99_ms": 4.288358,
+      "max_ms": 8.168483,
+      "max_vus": 200
+    },
+    "spike": {
+      "workload": "w1",
+      "base": "http://127.0.0.1:18000",
+      "target_rate": 2000,
+      "batch": 100,
+      "achieved_rps": 363.674669775136,
+      "requests": 21840,
+      "dropped_iterations": 36186,
+      "error_rate": 0,
+      "p50_ms": 1418.2790774999999,
+      "p90_ms": 2601.6051764000003,
+      "p95_ms": 2813.06383635,
+      "p99_ms": 4024.61399058,
+      "max_ms": 8022.244424,
+      "max_vus": 3000
+    },
+    "post": {
+      "workload": "w1",
+      "base": "http://127.0.0.1:18000",
+      "target_rate": 200,
+      "batch": 100,
+      "achieved_rps": 200.00746014832364,
+      "requests": 2001,
+      "dropped_iterations": 0,
+      "error_rate": 0,
+      "p50_ms": 2.872658,
+      "p90_ms": 3.813873,
+      "p95_ms": 4.272992,
+      "p99_ms": 12.233154,
+      "max_ms": 20.808408,
+      "max_vus": 200
+    }
+  },
+  "chaos": {
+    "valkey_down_ready": {
+      "status_code": 200,
+      "data": {
+        "status": "ready",
+        "dependencies": {
+          "database": "healthy",
+          "valkey": "error: Error 111 connecting to 127.0.0.1:6379. Connection refused."
+        }
+      }
+    },
+    "pgbouncer_down_ready": {
+      "status_code": 503,
+      "data": {
+        "status_code": 503,
+        "detail": {
+          "status": "not_ready",
+          "dependencies": {
+            "database": "error: [Errno 111] Connection refused",
+            "valkey": "healthy"
+          }
+        }
+      }
+    }
+  },
+  "correctness": {
+    "rls_leak": false,
+    "valid_idempotency": true,
+    "concurrent_statuses": [
+      200,
+      409
+    ]
+  }
+}
