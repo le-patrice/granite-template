@@ -200,6 +200,8 @@ spec:
           value: {{ first_superuser_email }}
         - name: FIRST_SUPERUSER_PASSWORD
           value: "{{ first_superuser_password | trim('\"\'') }}"
+        - name: DOCS_UI
+          value: "{{ docs_ui }}"
       volumeMounts:
         - name: backend-src
           mountPath: /app/src

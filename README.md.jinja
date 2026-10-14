@@ -31,9 +31,14 @@ make test
 {% if include_frontend %}
 - **Frontend Dashboard:** [http://localhost:{{ app_port }}](http://localhost:{{ app_port }})
 {% endif %}
-- **Swagger UI:** [http://localhost:{{ app_port }}/docs/swagger](http://localhost:{{ app_port }}/docs/swagger)
-- **Scalar UI:** [http://localhost:{{ app_port }}/docs/scalar](http://localhost:{{ app_port }}/docs/scalar)
-- **OpenAPI Schema:** [http://localhost:{{ app_port }}/docs/openapi.json](http://localhost:{{ app_port }}/docs/openapi.json)
+- **API Documentation ({{ docs_ui | capitalize }}):** [http://localhost:{{ app_port }}/docs](http://localhost:{{ app_port }}/docs)
+- **Alternative Interactive Docs UIs:**
+  - Swagger: [http://localhost:{{ app_port }}/docs/swagger](http://localhost:{{ app_port }}/docs/swagger)
+  - Scalar: [http://localhost:{{ app_port }}/docs/scalar](http://localhost:{{ app_port }}/docs/scalar)
+  - ReDoc: [http://localhost:{{ app_port }}/docs/redoc](http://localhost:{{ app_port }}/docs/redoc)
+  - Stoplight Elements: [http://localhost:{{ app_port }}/docs/elements](http://localhost:{{ app_port }}/docs/elements)
+  - RapiDoc: [http://localhost:{{ app_port }}/docs/rapidoc](http://localhost:{{ app_port }}/docs/rapidoc)
+- **OpenAPI 3.1 Schema:** [http://localhost:{{ app_port }}/docs/openapi.json](http://localhost:{{ app_port }}/docs/openapi.json)
 - **Health Readiness:** [http://localhost:{{ app_port }}/health/ready](http://localhost:{{ app_port }}/health/ready)
 {% if include_prometheus_metrics %}
 - **Prometheus Metrics:** [http://localhost:{{ app_port }}/metrics](http://localhost:{{ app_port }}/metrics)

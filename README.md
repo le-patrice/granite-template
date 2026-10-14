@@ -115,9 +115,12 @@ make seed
 | **Frontend Dashboard** | [http://localhost:8000](http://localhost:8000) | `FIRST_SUPERUSER_EMAIL` / `FIRST_SUPERUSER_PASSWORD` |
 | **Backend REST API** | [http://localhost:8000/api/v1](http://localhost:8000/api/v1) | JWT Bearer Token |
 | **Go Telemetry Ingest** | `http://localhost:8000/api/v1/telemetry/ingest` | Direct Traefik Microsecond Bypass |
-| **Scalar API Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Public |
+| **API Docs (Configurable)** | [http://localhost:8000/docs](http://localhost:8000/docs) | Configured by DOCS_UI (default: swagger) |
 | **Swagger UI Docs** | [http://localhost:8000/docs/swagger](http://localhost:8000/docs/swagger) | Public |
+| **Scalar API Docs** | [http://localhost:8000/docs/scalar](http://localhost:8000/docs/scalar) | Public |
 | **Redoc API Docs** | [http://localhost:8000/docs/redoc](http://localhost:8000/docs/redoc) | Public |
+| **Stoplight Elements** | [http://localhost:8000/docs/elements](http://localhost:8000/docs/elements) | Public |
+| **RapiDoc** | [http://localhost:8000/docs/rapidoc](http://localhost:8000/docs/rapidoc) | Public |
 | **Health Probes** | [http://localhost:8000/health/ready](http://localhost:8000/health/ready) | Public |
 | **Prometheus Metrics** | [http://localhost:8000/metrics](http://localhost:8000/metrics) | Scraper Endpoint |
 | **Mailpit Test Inbox** | [http://localhost:8025](http://localhost:8025) | Local Mail Inspector (SMTP :1025) |

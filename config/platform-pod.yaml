@@ -176,6 +176,8 @@ spec:
           value: admin@platform.internal
         - name: FIRST_SUPERUSER_PASSWORD
           value: AdminSecurePassword2026!
+        - name: DOCS_UI
+          value: "swagger"
       volumeMounts:
         - name: backend-src
           mountPath: /app/src

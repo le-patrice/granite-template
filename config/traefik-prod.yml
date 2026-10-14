@@ -122,7 +122,7 @@ http:
     docs-router:
       entryPoints:
         - web
-      rule: "HostRegexp(`^{subdomain:(docs|docs-prod)\\..*}`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`)"
+      rule: "HostRegexp(`^{subdomain:(docs|docs-prod)\\..*}`) || PathPrefix(`/docs`) || PathPrefix(`/scalar`) || PathPrefix(`/swagger`) || PathPrefix(`/redoc`) || PathPrefix(`/elements`) || PathPrefix(`/rapidoc`)"
       priority: 120
       service: app-service
       middlewares:

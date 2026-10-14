@@ -96,7 +96,7 @@ bootstrap:
 	@echo -e "$(GREEN)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
 	@echo -e "$(GREEN)$(BOLD)🎉 Platform Bootstrap Complete & Fully Operational!$(NC)"
 	@echo -e "$(GREEN)$(BOLD)══════════════════════════════════════════════════════════════════════$(NC)"
-	@echo -e "  $(CYAN)• API & Docs UI:$(NC)    http://localhost:8000/docs"
+	@echo -e "  $(CYAN)• API & Docs UI:$(NC)    http://localhost:8000/docs (All: /docs/swagger, /docs/scalar, /docs/redoc, /docs/elements, /docs/rapidoc)"
 	@echo -e "  $(CYAN)• Prometheus:$(NC)       http://localhost:8000/metrics"
 	@echo -e "  $(CYAN)• Health Probes:$(NC)    http://localhost:8000/health/ready"
 	@echo -e "  $(CYAN)• Superadmin Email:$(NC) $$(grep FIRST_SUPERUSER_EMAIL .env | cut -d= -f2 2>/dev/null || echo 'admin@platform.internal')"
