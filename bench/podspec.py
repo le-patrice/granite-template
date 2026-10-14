@@ -33,7 +33,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("src")
     ap.add_argument("out")
-    ap.add_argument("--workers", type=int, default=4)  # shipped Containerfile default
+    ap.add_argument("--workers", type=int, default=2)  # calibrated to match 2-CPU container limit
     ap.add_argument("--set", action="append", default=[], help="app env K=V")
     ap.add_argument("--pg-arg", action="append", default=[], help="postgres -c arg, e.g. shared_buffers=512MB")
     ap.add_argument("--pgb", action="append", default=[], help="pgbouncer env K=V")
@@ -51,8 +51,12 @@ def main() -> None:
             log.append(f"{name}: limits cpu={cpu} mem={mem}")
         if name == "app":
             cmd = [x for x in c["command"] if x != "--reload"]
-            i = cmd.index("--workers")
-            cmd[i + 1] = str(args.workers)
+            if "--workers" in cmd:
+                i = cmd.index("--workers")
+                cmd[i + 1] = str(args.workers)
+            if "--runtime-threads" in cmd:
+                i = cmd.index("--runtime-threads")
+                cmd[i + 1] = "1"
             c["command"] = cmd
             c.setdefault("env", []).append({"name": "RATE_LIMIT_ENABLED", "value": "false"})
             for kv in args.set:
