@@ -25,7 +25,16 @@ def upgrade() -> None:
     op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "pg_trgm";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "btree_gin";')
-    op.execute('CREATE EXTENSION IF NOT EXISTS "vector";')
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vector') THEN
+                CREATE EXTENSION IF NOT EXISTS "vector";
+            END IF;
+        END $$;
+        """
+    )
 
     # ------------------------------------------------------------------
     # 2. platform_users table  (mirrors app.domain.users.models.User)
