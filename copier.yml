@@ -26,12 +26,6 @@ _exclude:
   - ".git"
   - ".DS_Store"
 
-  # Working environment & secrets (prevent local secret leak into scaffolded projects)
-  - ".env"
-  - "*.env"
-  - "!*.env.jinja"
-  - "!*.env.example*"
-
   # Benchmark suite & parity baseline (template evaluation only)
   - "bench"
   - "bench/**"
