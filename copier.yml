@@ -4,31 +4,71 @@
 _min_copier_version: "9.0.0"
 _subdirectory: ""
 _exclude:
+  # Meta & Copier templates configuration
   - "copier.yaml"
   - "copier.yml"
   - "~*"
+  - "*.orig"
+  - "*.swp"
+
+  # Python bytecode & caches
   - "*.py[co]"
   - "__pycache__"
   - "**/__pycache__"
-  - ".git"
-  - ".DS_Store"
   - ".ruff_cache"
   - "**/.ruff_cache"
   - ".pytest_cache"
   - "**/.pytest_cache"
   - ".venv"
   - "**/.venv"
+
+  # Git & OS metadata
+  - ".git"
+  - ".DS_Store"
+
+  # Working environment & secrets (prevent local secret leak into scaffolded projects)
+  - ".env"
+  - "*.env"
+  - "!*.env.jinja"
+  - "!*.env.example*"
+
+  # Benchmark suite & parity baseline (template evaluation only)
+  - "bench"
+  - "bench/**"
+  - "go-baseline"
+  - "go-baseline/**"
+
+  # Template development documentation & visual assets
+  - "docs"
+  - "docs/**"
+
+  # Historical database dumps, logs & build outputs
+  - "backups"
+  - "backups/**"
+  - "logs"
+  - "logs/**"
+  - "*.log"
+  - "dist"
+  - "**/dist"
   - "node_modules"
   - "**/node_modules"
-  - "**/dist"
   - "references"
   - "references/**"
+
+  # Orphaned files
+  - "backend/Dockerfile"
+
+  # Conditional component exclusions
   - "{% if not enable_quadlets %}deployments/prod/quadlets/**{% endif %}"
   - "{% if not include_frontend %}frontend/**{% endif %}"
   - "{% if not include_frontend %}deployments/prod/quadlets/frontend.container*{% endif %}"
   - "{% if not include_go_telemetry %}services/telemetry-ingest{% endif %}"
   - "{% if not include_go_telemetry %}services/telemetry-ingest/**{% endif %}"
   - "{% if not include_go_telemetry %}deployments/prod/quadlets/telemetry-ingest.container*{% endif %}"
+  - "{% if not include_cloudflare_tunnel %}deployments/prod/quadlets/cloudflared.container*{% endif %}"
+  - "{% if not include_pgbouncer %}deployments/prod/quadlets/pgbouncer.container*{% endif %}"
+  - "{% if not include_valkey %}deployments/prod/quadlets/valkey.*{% endif %}"
+  - "{% if not include_distributed_worker %}deployments/prod/quadlets/worker.container*{% endif %}"
 
 # ------------------------------------------------------------------------------
 # Project Identity & Metadata
