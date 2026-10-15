@@ -9,11 +9,15 @@ reduces DB round-trips by ~1 000×.
 import uuid
 from datetime import UTC, datetime
 
+import structlog
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.telemetry.contracts import ITelemetryRepository
 from app.domain.telemetry.schemas import TelemetryRecord
+
+logger = structlog.get_logger()
 
 
 class PostgresTelemetryRepository(ITelemetryRepository):
@@ -71,9 +75,12 @@ class PostgresTelemetryRepository(ITelemetryRepository):
                 )
                 await self.session.commit()
                 return
-        except Exception:
+        except (SQLAlchemyError, AttributeError, OSError, RuntimeError) as exc:
             # Fallback to standard parameterised insert if driver COPY is unavailable
-            pass
+            logger.debug(
+                "Driver binary COPY unavailable or failed; using multi-row insert fallback",
+                error=str(exc),
+            )
 
         # 3. Fallback: single-statement bulk insert
         dict_rows = [

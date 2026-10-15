@@ -71,7 +71,9 @@ class SlidingWindowRateLimitMiddleware(AbstractMiddleware):
         super().__init__(app)
         valkey_client = get_valkey_pool()
         self._valkey_client = valkey_client
-        self._script = valkey_client.register_script(LUA_SLIDING_WINDOW) if valkey_client is not None else None
+        self._script = (
+            valkey_client.register_script(LUA_SLIDING_WINDOW) if valkey_client is not None else None
+        )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

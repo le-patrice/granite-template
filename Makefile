@@ -519,11 +519,52 @@ tunnel-restart: ## Restart the Cloudflare Tunnel container
 # Quality Assurance & Testing
 # ------------------------------------------------------------------------------
 .PHONY: lint
-lint: ## Run Ruff linter and formatter checks inside backend container
+lint: ## Run Ruff linter and formatter checks inside backend container or host
 	@echo -e "$(BLUE)Running Ruff linter and format check...$(NC)"
-	@$(EXEC_APP) ruff check src tests
-	@$(EXEC_APP) ruff format --check src tests
+	@if $(CONTAINER_ENGINE) ps --filter "name=$(POD_NAME)-app" --filter "status=running" -q 2>/dev/null | grep -q . ; then \
+		echo -e "$(BLUE)Executing checks inside running container ($(POD_NAME)-app)...$(NC)"; \
+		$(EXEC_APP) ruff check src tests && \
+		$(EXEC_APP) ruff format --check src tests; \
+	elif command -v ruff >/dev/null 2>&1; then \
+		echo -e "$(BLUE)Executing checks via local host ruff binary...$(NC)"; \
+		(cd backend && ruff check src tests && ruff format --check src tests); \
+	elif command -v uv >/dev/null 2>&1; then \
+		echo -e "$(BLUE)Executing checks via local host uv...$(NC)"; \
+		(cd backend && uv run ruff check src tests && uv run ruff format --check src tests); \
+	else \
+		echo -e "$(BLUE)Executing checks via ephemeral ruff container...$(NC)"; \
+		$(CONTAINER_ENGINE) run --rm -v $(PWD)/backend:/app:Z -w /app ghcr.io/astral-sh/ruff:latest check src tests && \
+		$(CONTAINER_ENGINE) run --rm -v $(PWD)/backend:/app:Z -w /app ghcr.io/astral-sh/ruff:latest format --check src tests; \
+	fi
 	@echo -e "$(GREEN)✅ Ruff lint and formatting passed cleanly$(NC)"
+
+.PHONY: lint-fix
+lint-fix: ## Auto-fix Ruff lint violations and reformat code
+	@echo -e "$(BLUE)Auto-fixing Ruff lint violations and formatting...$(NC)"
+	@if $(CONTAINER_ENGINE) ps --filter "name=$(POD_NAME)-app" --filter "status=running" -q 2>/dev/null | grep -q . ; then \
+		echo -e "$(BLUE)Executing auto-fix inside running container ($(POD_NAME)-app)...$(NC)"; \
+		$(EXEC_APP) ruff check --fix src tests && \
+		$(EXEC_APP) ruff format src tests; \
+	elif command -v ruff >/dev/null 2>&1; then \
+		echo -e "$(BLUE)Executing auto-fix via local host ruff binary...$(NC)"; \
+		(cd backend && ruff check --fix src tests && ruff format src tests); \
+	elif command -v uv >/dev/null 2>&1; then \
+		echo -e "$(BLUE)Executing auto-fix via local host uv...$(NC)"; \
+		(cd backend && uv run ruff check --fix src tests && uv run ruff format src tests); \
+	else \
+		echo -e "$(BLUE)Executing auto-fix via ephemeral ruff container...$(NC)"; \
+		$(CONTAINER_ENGINE) run --rm -v $(PWD)/backend:/app:Z -w /app ghcr.io/astral-sh/ruff:latest check --fix src tests && \
+		$(CONTAINER_ENGINE) run --rm -v $(PWD)/backend:/app:Z -w /app ghcr.io/astral-sh/ruff:latest format src tests; \
+	fi
+	@echo -e "$(GREEN)✅ Ruff auto-fix and format complete$(NC)"
+
+.PHONY: hooks-install
+hooks-install: ## Install git pre-commit hook to auto-run lint checks before git commit
+	@echo -e "$(BLUE)Installing git pre-commit hook...$(NC)"
+	@mkdir -p .git/hooks
+	@echo -e '#!/usr/bin/env bash\nset -e\necho "🔍 Running pre-commit QA checks..."\nmake lint\n' > .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo -e "$(GREEN)✅ Pre-commit hook installed in .git/hooks/pre-commit$(NC)"
 
 .PHONY: test
 test: ## Run test suite inside app container using isolated database subtransactions

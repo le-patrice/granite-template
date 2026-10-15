@@ -63,7 +63,9 @@ class IdempotencyMiddleware(AbstractMiddleware):
                 # 1. Atomically attempt to acquire in-flight lock using SET NX
                 # Eliminates check-then-set race window and saves 1 Valkey RTT on cache misses
                 in_progress_record = json.dumps({"status": "IN_PROGRESS"})
-                acquired = await valkey_client.set(cache_key, in_progress_record, nx=True, ex=LOCK_TTL_SECONDS)
+                acquired = await valkey_client.set(
+                    cache_key, in_progress_record, nx=True, ex=LOCK_TTL_SECONDS
+                )
 
                 if not acquired:
                     # Key already exists: fetch existing status (IN_PROGRESS or COMPLETED)
